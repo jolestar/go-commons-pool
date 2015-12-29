@@ -83,8 +83,6 @@ type LinkedBlockDeque struct {
 
 	/** Condition for waiting puts */
 	notFull chan int
-
-	interrupt bool
 }
 
 func NewDeque(capacity int) (*LinkedBlockDeque) {
@@ -95,7 +93,7 @@ func NewDeque(capacity int) (*LinkedBlockDeque) {
 	return &LinkedBlockDeque{capacity: capacity, lock: lock, notEmpty: make(chan int, 0), notFull: make(chan int, 0)}
 }
 
-func (this *LinkedBlockDeque) notFullBlock(timeout time.Duration) time.Duration {
+func (this *LinkedBlockDeque) notFullBlock(timeout time.Duration) (time.Duration,bool) {
 	if timeout.Nanoseconds() <= 0 {
 		_, ok := <-this.notFull
 		if debug {
@@ -105,15 +103,22 @@ func (this *LinkedBlockDeque) notFullBlock(timeout time.Duration) time.Duration 
 				fmt.Println("notFull close")
 			}
 		}
-		return 0
+		return 0, !ok
 	} else {
 		begin := time.Now().Nanosecond()
 		select {
-		case <-this.notFull:
+		case _,ok := <-this.notFull:
+			if debug {
+				if ok {
+					fmt.Println("notFull block end")
+				} else {
+					fmt.Println("notFull close")
+				}
+			}
 			end := time.Now().Nanosecond()
-			return time.Duration(end - begin)
+			return time.Duration(end - begin), !ok
 		case <-time.After(timeout):
-			return 0
+			return 0,false
 		}
 	}
 }
@@ -130,7 +135,10 @@ func (this *LinkedBlockDeque) notFullSignal() {
 	}
 }
 
-func (this *LinkedBlockDeque) notEmptyBlock(timeout time.Duration) time.Duration {
+/**
+return remain wait time, and is interrupt
+ */
+func (this *LinkedBlockDeque) notEmptyBlock(timeout time.Duration) (time.Duration,bool) {
 	if debug {
 		fmt.Println("notEmptyBlock timeout:", timeout)
 	}
@@ -143,15 +151,15 @@ func (this *LinkedBlockDeque) notEmptyBlock(timeout time.Duration) time.Duration
 				fmt.Println("notEmpty close")
 			}
 		}
-		return 0
+		return 0, !ok
 	} else {
 		begin := time.Now().Nanosecond()
 		select {
-		case <-this.notEmpty:
+		case _, ok := <-this.notEmpty:
 			end := time.Now().Nanosecond()
-			return time.Duration(end - begin)
+			return time.Duration(end - begin), !ok
 		case <-time.After(timeout):
-			return 0
+			return 0,false
 		}
 	}
 }
@@ -383,14 +391,12 @@ func (this *LinkedBlockDeque) PollFirstWithTimeout(timeout time.Duration) (e int
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
+	interrupt := false
 	for x = this.unlinkFirst(); x == nil; {
-		if timeout <= 0 {
-			return nil
+		if timeout <= 0 || interrupt {
+			break
 		}
-		if this.interrupt {
-			return nil
-		}
-		timeout = this.notEmptyBlock(timeout)
+		timeout,interrupt = this.notEmptyBlock(timeout)
 	}
 	return x
 }
@@ -406,14 +412,12 @@ func (this *LinkedBlockDeque) PollLastWithTimeout(timeout time.Duration) (e inte
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
+	interrupt := false
 	for x = this.unlinkLast(); x == nil; {
-		if timeout <= 0 {
-			return nil
+		if timeout <= 0 || interrupt {
+			break
 		}
-		if this.interrupt {
-			return nil
-		}
-		timeout = this.notEmptyBlock(timeout)
+		timeout,interrupt = this.notEmptyBlock(timeout)
 	}
 	return x
 }
@@ -433,17 +437,17 @@ func (this *LinkedBlockDeque) Poll() (e interface{}) {
  * to unlink if the queue is empty.
  *
  * @return the unlinked element
- * @throws InterruptedException if the current thread is interrupted
  */
 func (this *LinkedBlockDeque) TakeFirst() interface{} {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
+	interrupt := false
 	for x = this.unlinkFirst(); x == nil; {
-		if this.interrupt {
-			return nil
+		if interrupt {
+			break
 		}
-		this.notEmptyBlock(0)
+		_, interrupt = this.notEmptyBlock(0)
 	}
 	return x
 }
@@ -459,11 +463,12 @@ func (this *LinkedBlockDeque) TakeLast() interface{} {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
+	interrupt := false
 	for x = this.unlinkLast(); x == nil; {
-		if this.interrupt {
-			return nil
+		if interrupt {
+			break
 		}
-		this.notEmptyBlock(0)
+		_, interrupt = this.notEmptyBlock(0)
 	}
 	return x
 }
@@ -557,9 +562,11 @@ func (this *LinkedBlockDeque) InterruptTakeWaiters() {
 	if debug {
 		fmt.Println("InterruptTakeWaiters")
 	}
+	//TODO lock
 	//this.lock.Lock()
-	this.interrupt = true
 	close(this.notEmpty)
+	//create new channel
+	this.notEmpty = make(chan int, 0)
 	//this.lock.Unlock()
 }
 

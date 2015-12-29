@@ -25,12 +25,12 @@ func TestLinkedBlockQueueTestSuite(t *testing.T) {
 }
 
 func (suite *LinkedBlockDequeTestSuite) SetupTest() {
-	suite.deque, _ = NewDeque(2)
+	suite.deque = NewDeque(2)
 }
 
 
 func (suite *LinkedBlockDequeTestSuite) TestAdd() {
-	suite.deque, _ = NewDeque(3)
+	suite.deque = NewDeque(3)
 	suite.deque.Add(ONE)
 	suite.deque.Add(TWO)
 	suite.deque.Add(THREE)
@@ -139,12 +139,18 @@ func (suite *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
 
 func (suite *LinkedBlockDequeTestSuite) TestInterrupt() {
 	t := time.Tick(time.Duration(1000*time.Millisecond))
+	wait := sync.WaitGroup{}
+	wait.Add(2)
 	go func() {
 		for _ = range t{
 			suite.deque.InterruptTakeWaiters()
+			fmt.Println("TestInterrupt suite.deque.InterruptTakeWaiters")
+			wait.Done()
 		}
 	}()
 	assert.Nil(suite.T(), suite.deque.TakeFirst())
+	assert.Nil(suite.T(), suite.deque.TakeFirst())
+	wait.Wait()
 }
 
 func (suite *LinkedBlockDequeTestSuite) TestIterator() {
@@ -175,7 +181,7 @@ func (suite *LinkedBlockDequeTestSuite) TestDescendingIterator() {
 
 func (suite *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	count := 100;
-	suite.deque,_ = NewDeque(count)
+	suite.deque = NewDeque(count)
 
 	for i:=0;i < count;i++{
 		suite.deque.Add(i)
