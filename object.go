@@ -157,8 +157,12 @@ func (this *PooledObject) MarkAbandoned() {
 
 func (this *PooledObject) MarkReturning() {
 	this.lock.Lock()
-	this.state = RETURNING
+	this.markReturning()
 	this.lock.Unlock()
+}
+
+func (this *PooledObject) markReturning() {
+	this.state = RETURNING
 }
 
 func (this *PooledObject) startEvictionTest() bool {

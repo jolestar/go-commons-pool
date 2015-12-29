@@ -116,6 +116,9 @@ func (this *ObjectPool) decrementDestroyedByEvictorCount() int32 {
 }
 
 func (this *ObjectPool) create() *PooledObject {
+	if(debug){
+		fmt.Printf("pool create\n")
+	}
 	localMaxTotal := this.PoolConfig.MaxTotal
 	newCreateCount := this.incrementCreateCount()
 	if localMaxTotal > -1 && int(newCreateCount) > localMaxTotal ||
@@ -135,17 +138,20 @@ func (this *ObjectPool) create() *PooledObject {
 	//	if (ac != null && ac.getLogAbandoned()) {
 	//		p.setLogAbandoned(true);
 	//	}
-	this.allObjects.Put(p.Object, &p)
+	this.allObjects.Put(p.Object, p)
 	return p
 }
 
 func (this *ObjectPool) destroy(toDestroy *PooledObject) {
+	if(debug){
+		fmt.Printf("pool destroy %v \n", toDestroy)
+	}
 	toDestroy.Invalidate()
 	this.idleObjects.Remove(toDestroy)
 	this.allObjects.Remove(toDestroy.Object)
 	this.factory.DestroyObject(toDestroy)
 	//destroyedCount.incrementAndGet();
-	this.incrementCreateCount()
+	this.decrementCreateCount()
 }
 
 func (this *ObjectPool) updateStatsBorrow(object *PooledObject, timeMillis int64) {
@@ -208,6 +214,9 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 			if !p.Allocate() {
 				p = nil
 			}
+			if(debug){
+				fmt.Printf("pool p.Allocate p:%v \n", p)
+			}
 		} else {
 			p, ok = this.idleObjects.PollFirst().(*PooledObject)
 			if !ok {
@@ -227,12 +236,18 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if p != nil {
 			e := this.factory.ActivateObject(p)
 			if e != nil {
+				if(debug){
+					fmt.Printf("pool ActiveObject fail:%v \n", e)
+				}
 				this.destroy(p)
 				p = nil
 				if create {
 					return nil, errors.New("Timeout waiting for idle object")
 				}
 			}
+		}
+		if(debug){
+			fmt.Printf("pool ActiveObject end %v \n", p)
 		}
 		if p != nil && (this.PoolConfig.TestOnBorrow || create && this.PoolConfig.TestOnCreate) {
 			validate := this.factory.ValidateObject(p)
@@ -248,7 +263,9 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	}
 
 	this.updateStatsBorrow(p, currentTimeMillis()-waitTime)
-
+	if(debug){
+		fmt.Printf("pool borrowObject p:%v ,p.Object:%v \n", p, p.Object)
+	}
 	return p.Object,nil
 }
 
@@ -289,9 +306,15 @@ func (this *ObjectPool) IsClosed() bool {
 }
 
 func (this *ObjectPool) ReturnObject(object interface{}) error {
-	p := this.allObjects.Get(object).(*PooledObject)
+	if(debug){
+		fmt.Printf("pool ReturnObject %v \n", object)
+	}
+	if(object == nil){
+		return errors.New("object is nil.")
+	}
+	p,ok := this.allObjects.Get(object).(*PooledObject)
 
-	if p == nil {
+	if !ok {
 		if !this.isAbandonedConfig() {
 			return errors.New(
 				"Returned object not currently part of this pool")
@@ -306,7 +329,9 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 		return errors.New(
 			"Object has already been returned to this pool or is invalid")
 	}
-	p.MarkReturning() // Keep from being marked abandoned
+	//use unlock method markReturning() not MarkReturning
+	// because go lock is not recursive
+	p.markReturning() // Keep from being marked abandoned
 	p.lock.Unlock()
 	activeTime := p.GetActiveTimeMillis()
 
@@ -364,8 +389,8 @@ func (this *ObjectPool) Clear() {
 }
 
 func (this *ObjectPool) InvalidateObject(object interface{}) error {
-	p := this.allObjects.Get(object).(*PooledObject)
-	if p == nil {
+	p,ok := this.allObjects.Get(object).(*PooledObject)
+	if !ok {
 		if this.isAbandonedConfig() {
 			return nil
 		} else {
@@ -373,11 +398,9 @@ func (this *ObjectPool) InvalidateObject(object interface{}) error {
 				"Invalidated object not currently part of this pool")
 		}
 	}
-	p.lock.Lock()
-	if p.state != INVALID {
+	if p.GetState() != INVALID {
 		this.destroy(p)
 	}
-	p.lock.Unlock()
 	this.ensureIdle(1, false)
 	return nil
 }
