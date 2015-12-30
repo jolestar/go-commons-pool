@@ -449,6 +449,12 @@ func (this *ObjectPool) startEvictor(delay int64) {
 }
 
 func (this *ObjectPool) getEvictionPolicy() EvictionPolicy {
+	if(this.evictionPolicy == nil){
+		this.evictionPolicy = GetEvictionPolicy(this.PoolConfig.EvictionPolicyName)
+		if(this.evictionPolicy == nil){
+			this.evictionPolicy = GetEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME)
+		}
+	}
 	return this.evictionPolicy
 }
 
@@ -481,6 +487,9 @@ func (this *ObjectPool) getMinIdle() int{
 }
 
 func (this *ObjectPool) evict() {
+	if debug{
+		fmt.Printf("pool evict idle: %v \n", this.idleObjects.Size())
+	}
 	if this.idleObjects.Size() > 0 {
 		var underTest *PooledObject
 		evictionPolicy := this.getEvictionPolicy()
@@ -522,15 +531,7 @@ func (this *ObjectPool) evict() {
 			// crazy exceptions. Protect against such an exception
 			// killing the eviction thread.
 
-			evict, err := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
-			if err != nil {
-				// Slightly convoluted as SwallowedExceptionListener
-				// uses Exception rather than Throwable
-				//PoolUtils.checkRethrow(t);
-				//swallowException(new Exception(t));
-				// Don't evict on error conditions
-				evict = false
-			}
+			evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
 
 			if evict {
 				this.destroy(underTest)
@@ -581,4 +582,10 @@ func (this *ObjectPool) preparePool() {
 		return
 	}
 	this.ensureMinIdle()
+}
+
+func Prefill(pool *ObjectPool, count int){
+	for i:=0;i<count;i++{
+		pool.AddObject()
+	}
 }

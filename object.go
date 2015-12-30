@@ -43,7 +43,8 @@ type PooledObject struct {
 }
 
 func NewPooledObject(object interface{}) *PooledObject {
-	return &PooledObject{Object:object, CreateTime: currentTimeMillis(), LastUseTime:currentTimeMillis()}
+	time := currentTimeMillis()
+	return &PooledObject{Object:object, state:IDLE, CreateTime: time, LastUseTime:time, LastBorrowTime:time, LastReturnTime: time}
 }
 
 func currentTimeMillis() int64 {

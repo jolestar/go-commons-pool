@@ -3,7 +3,6 @@ package pool
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"math"
 	"math/rand"
@@ -36,6 +35,11 @@ type SimpleFactory struct {
 
 func NewSimpleFactory() *SimpleFactory {
 	return &SimpleFactory{maxTotal: math.MaxInt32, evenValid: true, oddValid: true, enableValidation: true}
+}
+
+func (this *SimpleFactory) setValid(valid bool) {
+	this.evenValid = valid
+	this.oddValid = valid
 }
 
 func (this *SimpleFactory) doWait(latency time.Duration) {
@@ -158,21 +162,15 @@ type PoolTestSuite struct {
 }
 
 func (this *PoolTestSuite) assertEquals(expect interface{}, actual interface{}) {
-	assert.Equal(this.T(), expect, actual)
+	this.Equal( expect, actual)
 }
 
 func (this *PoolTestSuite) assertNotNil(object interface{}) {
-	assert.NotNil(this.T(), object)
+	this.NotNil( object)
 }
 
 func (this *PoolTestSuite) assertNil(object interface{}) {
-	assert.Nil(this.T(), object)
-}
-
-func (this *PoolTestSuite) tryFail(err error) {
-	if err != nil {
-		this.Fail(err.Error())
-	}
+	this.Nil( object)
 }
 
 func TestPoolTestSuite(t *testing.T) {
@@ -180,11 +178,14 @@ func TestPoolTestSuite(t *testing.T) {
 }
 
 func (this *PoolTestSuite) SetupTest() {
-
+	this.makeEmptyPool(DEFAULT_MAX_TOTAL)
 }
 
 func (this *PoolTestSuite) TearDownTest() {
+	this.pool.Clear()
 	this.pool.Close()
+	this.pool = nil
+	this.factory = nil
 }
 
 func (this *PoolTestSuite) makeEmptyPool(maxTotal int) {
@@ -198,22 +199,21 @@ func getNthObject(num int) *TestObject {
 }
 
 func (this *PoolTestSuite) TestBaseBorrow() {
-	this.makeEmptyPool(3)
-
+	this.pool.PoolConfig.MaxTotal = 3
 	o0, err := this.pool.BorrowObject()
 
-	assert.Nil(this.T(), err)
-	assert.NotNil(this.T(), o0)
+	this.Nil( err)
+	this.NotNil( o0)
 
-	assert.Equal(this.T(), getNthObject(0), o0)
+	this.Equal( getNthObject(0), o0)
 	o1, _ := this.pool.BorrowObject()
-	assert.Equal(this.T(), getNthObject(1), o1)
+	this.Equal( getNthObject(1), o1)
 	o2, _ := this.pool.BorrowObject()
-	assert.Equal(this.T(), getNthObject(2), o2)
+	this.Equal( getNthObject(2), o2)
 }
 
 func (this *PoolTestSuite) TestBaseAddObject() {
-	this.makeEmptyPool(3)
+	this.pool.PoolConfig.MaxTotal = 3
 	this.assertEquals(0, this.pool.GetNumIdle())
 	this.assertEquals(0, this.pool.GetNumActive())
 	fmt.Println("test AddObject")
@@ -248,28 +248,28 @@ func (this *PoolTestSuite) isFifo() bool {
 }
 
 func (this *PoolTestSuite) TestBaseBorrowReturn() {
-	this.makeEmptyPool(3)
+	this.pool.PoolConfig.MaxTotal = 3
 
 	obj0, err0 := this.pool.BorrowObject()
-	this.tryFail(err0)
+	this.NoError(err0)
 	this.assertEquals(getNthObject(0), obj0)
 	obj1, err1 := this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertEquals(getNthObject(1), obj1)
 	obj2, err2 := this.pool.BorrowObject()
-	this.tryFail(err2)
+	this.NoError(err2)
 	this.assertEquals(getNthObject(2), obj2)
 	this.pool.ReturnObject(obj2)
 	obj2, err2 = this.pool.BorrowObject()
 	this.assertEquals(getNthObject(2), obj2)
 	this.pool.ReturnObject(obj1)
 	obj1, err1 = this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertEquals(getNthObject(1), obj1)
 	this.pool.ReturnObject(obj0)
 	this.pool.ReturnObject(obj2)
 	obj2, err2 = this.pool.BorrowObject()
-	this.tryFail(err2)
+	this.NoError(err2)
 	if this.isLifo() {
 		this.assertEquals(getNthObject(2), obj2)
 	}
@@ -278,7 +278,7 @@ func (this *PoolTestSuite) TestBaseBorrowReturn() {
 	}
 
 	obj0, err0 = this.pool.BorrowObject()
-	this.tryFail(err0)
+	this.NoError(err0)
 	if this.isLifo() {
 		this.assertEquals(getNthObject(0), obj0)
 	}
@@ -288,36 +288,36 @@ func (this *PoolTestSuite) TestBaseBorrowReturn() {
 }
 
 func (this *PoolTestSuite) TestBaseNumActiveNumIdle() {
-	this.makeEmptyPool(3)
+	this.pool.PoolConfig.MaxTotal = 3
 
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	obj0, err0 := this.pool.BorrowObject()
-	this.tryFail(err0)
+	this.NoError(err0)
 	this.assertEquals(1, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	obj1, err1 := this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertEquals(2, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	this.pool.ReturnObject(obj1)
 	this.assertEquals(1, this.pool.GetNumActive())
 	this.assertEquals(1, this.pool.GetNumIdle())
 	err := this.pool.ReturnObject(obj0)
-	this.tryFail(err)
+	this.NoError(err)
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(2, this.pool.GetNumIdle())
 }
 
 func (this *PoolTestSuite) TestBaseClear() {
-	this.makeEmptyPool(3)
+	this.pool.PoolConfig.MaxTotal = 3
 
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	obj0, err0 := this.pool.BorrowObject()
-	this.tryFail(err0)
+	this.NoError(err0)
 	obj1, err1 := this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertEquals(2, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	this.pool.ReturnObject(obj1)
@@ -328,50 +328,50 @@ func (this *PoolTestSuite) TestBaseClear() {
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	obj2, err2 := this.pool.BorrowObject()
-	this.tryFail(err2)
+	this.NoError(err2)
 	this.assertEquals(getNthObject(2), obj2)
 }
 
 func (this *PoolTestSuite) TestBaseInvalidateObject() {
-	this.makeEmptyPool(3)
+	this.pool.PoolConfig.MaxTotal = 3
 
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	obj0, err0 := this.pool.BorrowObject()
-	this.tryFail(err0)
+	this.NoError(err0)
 	obj1, err1 := this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertEquals(2, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	err := this.pool.InvalidateObject(obj0)
-	this.tryFail(err)
+	this.NoError(err)
 	this.assertEquals(1, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 	err = this.pool.InvalidateObject(obj1)
-	this.tryFail(err)
+	this.NoError(err)
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
 }
 
 func (this *PoolTestSuite) TestBaseClosePool() {
-	this.makeEmptyPool(3)
+	this.pool.PoolConfig.MaxTotal = 3
 
 	obj, err := this.pool.BorrowObject()
-	this.tryFail(err)
+	this.NoError(err)
 	this.pool.ReturnObject(obj)
 
 	this.pool.Close()
 	obj, err = this.pool.BorrowObject()
-	assert.NotNil(this.T(), err)
-	assert.Nil(this.T(), obj)
+	this.NotNil( err)
+	this.Nil( obj)
 }
 
 func (this *PoolTestSuite) TestWhenExhaustedFail() {
-	this.makeEmptyPool(1)
+	this.pool.PoolConfig.MaxTotal = 1
 
 	this.pool.PoolConfig.BlockWhenExhausted = false
 	obj1, err1 := this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertNotNil(obj1)
 
 	obj2, err2 := this.pool.BorrowObject()
@@ -384,12 +384,12 @@ func (this *PoolTestSuite) TestWhenExhaustedFail() {
 }
 
 func (this *PoolTestSuite) TestWhenExhaustedBlock() {
-	this.makeEmptyPool(1)
+	this.pool.PoolConfig.MaxTotal = 1
 
 	this.pool.PoolConfig.BlockWhenExhausted = true
 	this.pool.PoolConfig.MaxWaitMillis = int64(10)
 	obj1, err1 := this.pool.BorrowObject()
-	this.tryFail(err1)
+	this.NoError(err1)
 	this.assertNotNil(obj1)
 	obj2, err2 := this.pool.BorrowObject()
 	this.assertNil(obj2)
@@ -417,7 +417,7 @@ func borrowAndWait(pool *ObjectPool, pause time.Duration) chan int {
 }
 
 func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
-	this.makeEmptyPool(1)
+	this.pool.PoolConfig.MaxTotal = 1
 
 	this.pool.PoolConfig.BlockWhenExhausted = true
 	this.pool.PoolConfig.MaxWaitMillis = int64(-1)
@@ -441,7 +441,7 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 
 	borrowTime := <-ch
 	fmt.Println("TestWhenExhaustedBlockInterrupt borrowTime:", borrowTime)
-	assert.True(this.T(), borrowTime > 200)
+	this.True( borrowTime >= 200)
 
 	// Check thread was interrupted
 	//assertTrue(wtt._thrown instanceof InterruptedException);
@@ -452,14 +452,13 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 	// Bug POOL-162 - check there is now an object in the pool
 	this.pool.PoolConfig.MaxWaitMillis = int64(10)
 	obj2, err2 := this.pool.BorrowObject()
-	this.tryFail(err2)
+	this.NoError(err2)
 	this.assertNotNil(obj2)
 	this.pool.ReturnObject(obj2)
 
 }
 
 func (this *PoolTestSuite) TestEvictWhileEmpty() {
-	this.makeEmptyPool(DEFAULT_MAX_TOTAL)
 
 	this.pool.evict()
 	this.pool.evict()
@@ -490,11 +489,11 @@ type TestRunnable struct {
 }
 
 func NewTestThreadSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestRunnable {
-	return NewTestThread(pool,iter, delay,delay,randomDelay, nil)
+	return NewTestThread(pool, iter, delay, delay, randomDelay, nil)
 }
 
 func NewTestThread(pool *ObjectPool, iter int, startDelay int,
-holdTime int, randomDelay bool, obj interface{}) *TestRunnable {
+	holdTime int, randomDelay bool, obj interface{}) *TestRunnable {
 	return &TestRunnable{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
 }
 
@@ -540,7 +539,6 @@ func (this *TestRunnable) Run() {
 }
 
 func (this *PoolTestSuite) TestEvictAddObjects() {
-	this.makeEmptyPool(DEFAULT_MAX_TOTAL)
 
 	this.factory.makeLatency = 300
 	this.factory.maxTotal = 2
@@ -549,12 +547,237 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	this.pool.BorrowObject() // numActive = 1, numIdle = 0
 	// Create a test thread that will run once and try a borrow after
 	// 150ms fixed delay
-	 borrower := NewTestThreadSimple(this.pool, 1, 150, false)
+	borrower := NewTestThreadSimple(this.pool, 1, 150, false)
 	borrowerThread := NewThreadWithRunnable(borrower)
 	//// Set evictor to run in 100 ms - will create idle instance
 	this.pool.PoolConfig.TimeBetweenEvictionRunsMillis = int64(100)
-	borrowerThread.Start();  // Off to the races
-	borrowerThread.Join();
-	fmt.Printf("TestEvictAddObjects %v error:%v",borrower,borrower.error )
-	assert.True(this.T(),!borrower.failed)
+	borrowerThread.Start() // Off to the races
+	borrowerThread.Join()
+	fmt.Printf("TestEvictAddObjects %v error:%v", borrower, borrower.error)
+	this.True(!borrower.failed)
+}
+
+func (this *PoolTestSuite) TestEvictLIFO() {
+	this.checkEvict(true)
+}
+
+func (this *PoolTestSuite) TestEvictFIFO() {
+	this.checkEvict(false)
+}
+
+func (this *PoolTestSuite) checkEvict(lifo bool) {
+	var idle int
+	// yea this is hairy but it tests all the code paths in GOP.evict()
+	this.pool.PoolConfig.SoftMinEvictableIdleTimeMillis = int64(10)
+	this.pool.PoolConfig.MinIdle = 2
+	this.pool.PoolConfig.TestWhileIdle = true
+	this.pool.PoolConfig.Lifo = lifo
+	Prefill(this.pool, 5)
+	this.pool.evict()
+	idle = this.pool.GetNumIdle()
+	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	this.factory.evenValid = false
+	this.factory.oddValid = false
+	this.factory.exceptionOnActivate = true
+	this.pool.evict()
+	idle = this.pool.GetNumIdle()
+	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	Prefill(this.pool, 5)
+	this.factory.exceptionOnActivate = false
+	this.factory.exceptionOnPassivate = true
+	this.pool.evict()
+	idle = this.pool.GetNumIdle()
+	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	this.factory.exceptionOnPassivate = false
+	this.factory.evenValid = true
+	this.factory.oddValid = true
+	time.Sleep(time.Duration(125) * time.Millisecond)
+	this.pool.evict()
+	idle = this.pool.GetNumIdle()
+	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	this.assertEquals(2, this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestEvictionOrder() {
+	this.checkEvictionOrder(false)
+	this.TearDownTest()
+	this.SetupTest()
+	this.checkEvictionOrder(true)
+}
+
+func (this *PoolTestSuite) checkEvictionOrder(lifo bool) {
+	this.checkEvictionOrderPart1(lifo)
+	this.TearDownTest()
+	this.SetupTest()
+	this.checkEvictionOrderPart2(lifo)
+}
+
+func (this *PoolTestSuite) checkEvictionOrderPart1(lifo bool) {
+	this.pool.PoolConfig.NumTestsPerEvictionRun = 2
+	this.pool.PoolConfig.MinEvictableIdleTimeMillis = 100
+	this.pool.PoolConfig.Lifo = lifo
+	for i := 0; i < 5; i++ {
+		this.pool.AddObject()
+		time.Sleep(100)
+	}
+	// Order, oldest to youngest, is "0", "1", ...,"4"
+	this.pool.evict() // Should evict "0" and "1"
+	obj, _ := this.pool.BorrowObject()
+	this.True(getNthObject(0) != obj, "oldest not evicted")
+	this.True(getNthObject(1) != obj, "second oldest not evicted")
+	// 2 should be next out for FIFO, 4 for LIFO
+	var expect *TestObject
+	if lifo {
+		expect = getNthObject(4)
+	} else {
+		expect = getNthObject(2)
+	}
+	this.Equal( expect, obj, "Wrong instance returned")
+}
+
+func (this *PoolTestSuite) checkEvictionOrderPart2(lifo bool) {
+	// Two eviction runs in sequence
+	this.pool.PoolConfig.NumTestsPerEvictionRun = 2
+	this.pool.PoolConfig.MinEvictableIdleTimeMillis = int64(100)
+	this.pool.PoolConfig.Lifo = lifo
+	for i := 0; i < 5; i++ {
+		this.pool.AddObject()
+		time.Sleep(100)
+	}
+	this.pool.evict() // Should evict "0" and "1"
+	this.pool.evict() // Should evict "2" and "3"
+	obj, _ := this.pool.BorrowObject()
+	this.Equal( getNthObject(4), obj, "Wrong instance remaining in pool")
+}
+
+func (this *PoolTestSuite) TestEvictorVisiting() {
+	this.checkEvictorVisiting(true)
+	this.checkEvictorVisiting(false)
+}
+
+func (this *PoolTestSuite) checkEvictorVisiting(lifo bool) {
+	//TODO
+}
+
+func (this *PoolTestSuite) TestExceptionOnPassivateDuringReturn() {
+	obj, _ := this.pool.BorrowObject()
+	this.factory.exceptionOnPassivate = true
+	this.pool.ReturnObject(obj)
+	this.assertEquals(0, this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestExceptionOnDestroyDuringBorrow() {
+	this.factory.exceptionOnDestroy = true
+	this.pool.PoolConfig.TestOnBorrow = true
+	this.pool.BorrowObject()
+	this.factory.setValid(false) // Make validation fail on next borrow attempt
+	_, err := this.pool.BorrowObject()
+	this.NotNil(err)
+	this.assertEquals(1, this.pool.GetNumActive())
+	this.assertEquals(0, this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestExceptionOnDestroyDuringReturn() {
+	this.factory.exceptionOnDestroy = true
+	this.pool.PoolConfig.TestOnReturn = true
+	obj1, _ := this.pool.BorrowObject()
+	this.pool.BorrowObject()
+	this.factory.setValid(false) // Make validation fail
+	this.pool.ReturnObject(obj1)
+	this.assertEquals(1, this.pool.GetNumActive())
+	this.assertEquals(0, this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestExceptionOnActivateDuringBorrow() {
+	obj1, _ := this.pool.BorrowObject()
+	obj2, _ := this.pool.BorrowObject()
+	this.pool.ReturnObject(obj1)
+	this.pool.ReturnObject(obj2)
+	this.factory.exceptionOnActivate = true
+	this.factory.evenValid = false
+	// Activation will now throw every other time
+	// First attempt throws, but loop continues and second succeeds
+	obj, _ := this.pool.BorrowObject()
+	this.assertEquals(1, this.pool.GetNumActive())
+	this.assertEquals(0, this.pool.GetNumIdle())
+
+	this.pool.ReturnObject(obj)
+	this.factory.setValid(false)
+	// Validation will now fail on activation when borrowObject returns
+	// an idle instance, and then when attempting to create a new instance
+	_, err := this.pool.BorrowObject()
+	//TODO check error type
+	this.NotNil(err)
+
+	this.assertEquals(0, this.pool.GetNumActive())
+	this.assertEquals(0, this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestNegativeMaxTotal() {
+	this.pool.PoolConfig.MaxTotal = -1
+	this.pool.PoolConfig.BlockWhenExhausted = false
+	obj, _ := this.pool.BorrowObject()
+	this.assertEquals(getNthObject(0), obj)
+	this.pool.ReturnObject(obj)
+}
+
+func (this *PoolTestSuite) TestMaxIdle() {
+	this.pool.PoolConfig.MaxTotal = 100
+	this.pool.PoolConfig.MaxIdle = 8
+	active := make([]*TestObject, 100)
+	for i := 0; i < 100; i++ {
+		obj, err := this.pool.BorrowObject()
+		this.NoError(err)
+		testObj := obj.(*TestObject)
+		this.NotNil(testObj)
+		active[i] = testObj
+	}
+	this.assertEquals(100, this.pool.GetNumActive())
+	this.assertEquals(0, this.pool.GetNumIdle())
+	for i := 0; i < 100; i++ {
+		obj := active[i]
+		fmt.Printf("TestMaxIdle ReturnObject %v \n", obj)
+		err := this.pool.ReturnObject(obj)
+		this.NoError(err)
+		this.assertEquals(99-i, this.pool.GetNumActive())
+		idle := this.pool.PoolConfig.MaxIdle
+		if i < idle {
+			idle = i + 1
+		}
+		this.assertEquals(idle, this.pool.GetNumIdle())
+	}
+}
+
+func (this *PoolTestSuite) TestMaxIdleZero() {
+	this.pool.PoolConfig.MaxTotal = 100
+	this.pool.PoolConfig.MaxIdle = 0
+	active := make([]*TestObject, 100)
+	for i := 0; i < 100; i++ {
+		obj, err := this.pool.BorrowObject()
+		this.NoError(err)
+		testObj := obj.(*TestObject)
+		this.NotNil(testObj)
+		active[i] = testObj
+	}
+	this.assertEquals(100, this.pool.GetNumActive())
+	this.assertEquals(0, this.pool.GetNumIdle())
+	for i := 0; i < 100; i++ {
+		this.pool.ReturnObject(active[i])
+		this.assertEquals(99-i, this.pool.GetNumActive())
+		this.assertEquals(0, this.pool.GetNumIdle())
+	}
+}
+
+func (this *PoolTestSuite) TestMaxTotal() {
+	this.pool.PoolConfig.MaxTotal = 3
+	this.pool.PoolConfig.BlockWhenExhausted = false
+
+	_,err := this.pool.BorrowObject()
+	this.NoError(err)
+	_,err = this.pool.BorrowObject()
+	this.NoError(err)
+	_,err = this.pool.BorrowObject()
+	this.NoError(err)
+	_, err = this.pool.BorrowObject()
+	this.Error(err)
 }

@@ -93,19 +93,19 @@ type EvictionConfig struct {
 }
 
 type EvictionPolicy interface {
-	Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) (bool, error)
+	Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) (bool)
 }
 
 type DefaultEvictionPolicy struct {
 }
 
-func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) (bool, error) {
+func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) (bool) {
 	if (config.IdleSoftEvictTime < underTest.GetIdleTimeMillis() &&
 		config.MinIdle < idleCount) ||
 		config.IdleEvictTime < underTest.GetIdleTimeMillis() {
-		return true,nil
+		return true
 	}
-	return false,nil
+	return false
 }
 
 var (
