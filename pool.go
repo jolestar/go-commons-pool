@@ -14,7 +14,7 @@ const(
 )
 type ObjectPool struct {
 	AbandonedConfig         *AbandonedConfig
-	PoolConfig              *ObjectPoolConfig
+	Config                  *ObjectPoolConfig
 	closed                  bool
 	closeLock               sync.Mutex
 	evictionLock            sync.Mutex
@@ -29,7 +29,7 @@ type ObjectPool struct {
 }
 
 func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
-	return &ObjectPool{factory:factory, PoolConfig:config,
+	return &ObjectPool{factory:factory, Config:config,
 		idleObjects: collections.NewDeque(math.MaxInt32),
 		allObjects:collections.NewSyncMap()}
 }
@@ -53,7 +53,7 @@ func (this *ObjectPool) AddObject() {
 func (this *ObjectPool) addIdleObject(p *PooledObject) {
 	if p != nil {
 		this.factory.PassivateObject(p)
-		if this.PoolConfig.Lifo {
+		if this.Config.Lifo {
 			this.idleObjects.AddFirst(p)
 		} else {
 			this.idleObjects.AddLast(p)
@@ -62,7 +62,7 @@ func (this *ObjectPool) addIdleObject(p *PooledObject) {
 }
 
 func (this *ObjectPool) BorrowObject() (interface{}, error) {
-	return this.borrowObject(this.PoolConfig.MaxWaitMillis)
+	return this.borrowObject(this.Config.MaxWaitMillis)
 }
 
 func (this *ObjectPool) GetNumIdle() int {
@@ -119,7 +119,7 @@ func (this *ObjectPool) create() *PooledObject {
 	if(debug){
 		fmt.Printf("pool create\n")
 	}
-	localMaxTotal := this.PoolConfig.MaxTotal
+	localMaxTotal := this.Config.MaxTotal
 	newCreateCount := this.incrementCreateCount()
 	if localMaxTotal > -1 && int(newCreateCount) > localMaxTotal ||
 		newCreateCount >= math.MaxInt32 {
@@ -171,7 +171,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	ac := this.AbandonedConfig
 	if ac != nil && ac.RemoveAbandonedOnBorrow &&
 		(this.GetNumIdle() < 2) &&
-		(this.GetNumActive() > this.PoolConfig.MaxTotal-3) {
+		(this.GetNumActive() > this.Config.MaxTotal-3) {
 		this.removeAbandoned(ac)
 	}
 
@@ -179,7 +179,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 
 	// Get local copy of current config so it is consistent for entire
 	// method execution
-	blockWhenExhausted := this.PoolConfig.BlockWhenExhausted
+	blockWhenExhausted := this.Config.BlockWhenExhausted
 
 	var create bool
 	waitTime := currentTimeMillis()
@@ -249,7 +249,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if(debug){
 			fmt.Printf("pool ActiveObject end %v \n", p)
 		}
-		if p != nil && (this.PoolConfig.TestOnBorrow || create && this.PoolConfig.TestOnCreate) {
+		if p != nil && (this.Config.TestOnBorrow || create && this.Config.TestOnCreate) {
 			validate := this.factory.ValidateObject(p)
 			if !validate {
 				this.destroy(p)
@@ -287,7 +287,7 @@ func (this *ObjectPool) ensureIdle(idleCount int, always bool) {
 			// create will work. Give up.
 			break
 		}
-		if this.PoolConfig.Lifo {
+		if this.Config.Lifo {
 			this.idleObjects.AddFirst(p)
 		} else {
 			this.idleObjects.AddLast(p)
@@ -335,7 +335,7 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 	p.lock.Unlock()
 	activeTime := p.GetActiveTimeMillis()
 
-	if this.PoolConfig.TestOnReturn {
+	if this.Config.TestOnReturn {
 		if !this.factory.ValidateObject(p) {
 			this.destroy(p)
 			this.ensureIdle(1, false)
@@ -359,11 +359,11 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 		return errors.New("Object has already been returned to this pool or is invalid")
 	}
 
-	maxIdleSave := this.PoolConfig.MaxIdle
+	maxIdleSave := this.Config.MaxIdle
 	if this.IsClosed() || maxIdleSave > -1 && maxIdleSave <= this.idleObjects.Size() {
 		this.destroy(p)
 	} else {
-		if this.PoolConfig.Lifo {
+		if this.Config.Lifo {
 			this.idleObjects.AddFirst(p)
 		} else {
 			this.idleObjects.AddLast(p)
@@ -450,7 +450,7 @@ func (this *ObjectPool) startEvictor(delay int64) {
 
 func (this *ObjectPool) getEvictionPolicy() EvictionPolicy {
 	if(this.evictionPolicy == nil){
-		this.evictionPolicy = GetEvictionPolicy(this.PoolConfig.EvictionPolicyName)
+		this.evictionPolicy = GetEvictionPolicy(this.Config.EvictionPolicyName)
 		if(this.evictionPolicy == nil){
 			this.evictionPolicy = GetEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME)
 		}
@@ -459,7 +459,7 @@ func (this *ObjectPool) getEvictionPolicy() EvictionPolicy {
 }
 
 func (this *ObjectPool) getNumTests() int {
-	numTestsPerEvictionRun := this.PoolConfig.NumTestsPerEvictionRun
+	numTestsPerEvictionRun := this.Config.NumTestsPerEvictionRun
 	if numTestsPerEvictionRun >= 0 {
 		if numTestsPerEvictionRun < this.idleObjects.Size() {
 			return numTestsPerEvictionRun
@@ -471,7 +471,7 @@ func (this *ObjectPool) getNumTests() int {
 }
 
 func (this *ObjectPool) EvictionIterator() collections.Iterator {
-	if this.PoolConfig.Lifo {
+	if this.Config.Lifo {
 		return this.idleObjects.DescendingIterator()
 	} else {
 		return this.idleObjects.Iterator()
@@ -479,11 +479,11 @@ func (this *ObjectPool) EvictionIterator() collections.Iterator {
 }
 
 func (this *ObjectPool) getMinIdle() int{
-	maxIdleSave := this.PoolConfig.MaxIdle
-	if this.PoolConfig.MinIdle > maxIdleSave {
+	maxIdleSave := this.Config.MaxIdle
+	if this.Config.MinIdle > maxIdleSave {
 		return maxIdleSave
 	}
-	return this.PoolConfig.MinIdle
+	return this.Config.MinIdle
 }
 
 func (this *ObjectPool) evict() {
@@ -495,11 +495,11 @@ func (this *ObjectPool) evict() {
 		evictionPolicy := this.getEvictionPolicy()
 		this.evictionLock.Lock()
 		evictionConfig := EvictionConfig{
-			IdleEvictTime:     this.PoolConfig.MinEvictableIdleTimeMillis,
-			IdleSoftEvictTime: this.PoolConfig.SoftMinEvictableIdleTimeMillis,
-			MinIdle:           this.PoolConfig.MinIdle}
+			IdleEvictTime:     this.Config.MinEvictableIdleTimeMillis,
+			IdleSoftEvictTime: this.Config.SoftMinEvictableIdleTimeMillis,
+			MinIdle:           this.Config.MinIdle}
 
-		testWhileIdle := this.PoolConfig.TestWhileIdle
+		testWhileIdle := this.Config.TestWhileIdle
 
 		for i, m := 0, this.getNumTests(); i < m; i++ {
 			if this.evictionIterator == nil || !this.evictionIterator.HasNext() {
