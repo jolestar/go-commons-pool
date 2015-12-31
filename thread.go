@@ -7,33 +7,33 @@ type Runnable interface {
 }
 
 type FuncRun struct {
-	 f func()
+	f func()
 }
 
-func (this *FuncRun) Run()  {
+func (this *FuncRun) Run() {
 	this.f()
 }
 
 type Thread struct {
 	target Runnable
-	done chan int
+	done   chan int
 }
 
-func NewThread(f func()) *Thread{
-	return NewThreadWithRunnable(&FuncRun{f:f})
+func NewThread(f func()) *Thread {
+	return NewThreadWithRunnable(&FuncRun{f: f})
 }
 
-func NewThreadWithRunnable(run Runnable) *Thread{
-	return &Thread{target:run,done:make(chan int, 1)}
+func NewThreadWithRunnable(run Runnable) *Thread {
+	return &Thread{target: run, done: make(chan int, 1)}
 }
 
-func (this *Thread) Start()  {
+func (this *Thread) Start() {
 	go func() {
 		this.target.Run()
 		this.done <- 0
 	}()
 }
 
-func (this *Thread) Join()  {
-	 <- this.done
+func (this *Thread) Join() {
+	<-this.done
 }

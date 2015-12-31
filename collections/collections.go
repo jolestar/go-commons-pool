@@ -1,7 +1,8 @@
 package collections
+
 import (
-	"sync"
 	"reflect"
+	"sync"
 )
 
 type Iterator interface {
@@ -10,7 +11,7 @@ type Iterator interface {
 	Remove()
 }
 
-type SyncIdentityMap struct{
+type SyncIdentityMap struct {
 	sync.RWMutex
 	m map[uintptr]interface{}
 }
@@ -18,7 +19,7 @@ type SyncIdentityMap struct{
 func NewSyncMap() *SyncIdentityMap {
 	return &SyncIdentityMap{m: make(map[uintptr]interface{})}
 }
-func (this *SyncIdentityMap)Get(key interface{}) (interface{}) {
+func (this *SyncIdentityMap) Get(key interface{}) interface{} {
 	this.RLock()
 	keyPtr := genKey(key)
 	value := this.m[keyPtr]
@@ -26,26 +27,26 @@ func (this *SyncIdentityMap)Get(key interface{}) (interface{}) {
 	return value
 }
 
-func genKey(key interface{}) uintptr  {
+func genKey(key interface{}) uintptr {
 	keyValue := reflect.ValueOf(key)
 	return keyValue.Pointer()
 }
 
-func (this *SyncIdentityMap)Put(key interface{}, value interface{})  {
+func (this *SyncIdentityMap) Put(key interface{}, value interface{}) {
 	this.Lock()
 	keyPtr := genKey(key)
 	this.m[keyPtr] = value
 	this.Unlock()
 }
 
-func (this *SyncIdentityMap)Remove(key interface{})  {
+func (this *SyncIdentityMap) Remove(key interface{}) {
 	this.Lock()
 	keyPtr := genKey(key)
 	delete(this.m, keyPtr)
 	this.Unlock()
 }
 
-func (this *SyncIdentityMap)Size() int  {
+func (this *SyncIdentityMap) Size() int {
 	this.RLock()
 	defer this.RUnlock()
 	return len(this.m)
@@ -54,11 +55,11 @@ func (this *SyncIdentityMap)Size() int  {
 /**
  * for support multi thread, just copy all map value to slice
  */
-func (this *SyncIdentityMap) Values() ([]interface{}) {
+func (this *SyncIdentityMap) Values() []interface{} {
 	this.RLock()
 	defer this.RUnlock()
 	var list []interface{}
-	for _,v := range this.m {
+	for _, v := range this.m {
 		list = append(list, v)
 	}
 	return list

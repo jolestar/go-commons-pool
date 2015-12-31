@@ -300,7 +300,7 @@ func (this *LinkedBlockDeque) PollFirstWithTimeout(timeout time.Duration) (e int
 	defer this.lock.Unlock()
 	var x interface{}
 	interrupt := false
-	for x = this.unlinkFirst(); x == nil;x = this.unlinkFirst() {
+	for x = this.unlinkFirst(); x == nil; x = this.unlinkFirst() {
 		if timeout <= 0 || interrupt {
 			break
 		}

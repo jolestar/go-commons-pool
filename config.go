@@ -1,8 +1,9 @@
 package pool
+
 import (
 	"errors"
-	"sync"
 	"fmt"
+	"sync"
 )
 
 const (
@@ -83,7 +84,7 @@ type AbandonedConfig struct {
 	RemoveAbandonedOnBorrow      bool
 	RemoveAbandonedOnMaintenance bool
 	// Timeout in seconds before an abandoned object can be removed.
-	RemoveAbandonedTimeout       int
+	RemoveAbandonedTimeout int
 }
 
 type EvictionConfig struct {
@@ -93,13 +94,13 @@ type EvictionConfig struct {
 }
 
 type EvictionPolicy interface {
-	Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) (bool)
+	Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool
 }
 
 type DefaultEvictionPolicy struct {
 }
 
-func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) (bool) {
+func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
 	if (config.IdleSoftEvictTime < underTest.GetIdleTimeMillis() &&
 		config.MinIdle < idleCount) ||
 		config.IdleEvictTime < underTest.GetIdleTimeMillis() {
@@ -110,11 +111,11 @@ func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *Pool
 
 var (
 	policiesMutex sync.Mutex
-	policies = make(map[string]EvictionPolicy)
+	policies      = make(map[string]EvictionPolicy)
 )
 
-func RegistryEvictionPolicy(name string, policy EvictionPolicy)  {
-	if(name == "" || policy == nil){
+func RegistryEvictionPolicy(name string, policy EvictionPolicy) {
+	if name == "" || policy == nil {
 		panic(errors.New("invalid argument"))
 	}
 	fmt.Println("RegistryEvictionPolicy", name)
@@ -124,15 +125,15 @@ func RegistryEvictionPolicy(name string, policy EvictionPolicy)  {
 }
 
 func GetEvictionPolicy(name string) EvictionPolicy {
-	if(name == ""){
+	if name == "" {
 		return nil
 	}
 	policiesMutex.Lock()
-	defer  policiesMutex.Unlock()
+	defer policiesMutex.Unlock()
 	return policies[name]
 
 }
 
-func init()  {
+func init() {
 	RegistryEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME, new(DefaultEvictionPolicy))
 }

@@ -995,7 +995,7 @@ func (this *PoolTestSuite) TestEvictionPolicy() {
 
 	RegistryEvictionPolicy(TestEvictionPolicyName, evictionPolicy)
 
-	_,ok := this.pool.getEvictionPolicy().(*DefaultEvictionPolicy)
+	_, ok := this.pool.getEvictionPolicy().(*DefaultEvictionPolicy)
 	this.True(ok, "EvictionPolicy is not default policy")
 
 	this.pool.Config.EvictionPolicyName = TestEvictionPolicyName

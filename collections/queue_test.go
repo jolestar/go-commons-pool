@@ -1,14 +1,14 @@
 package collections
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"fmt"
-	"time"
-	"sync"
 	"reflect"
+	"sync"
 	"sync/atomic"
+	"testing"
+	"time"
 )
 
 var ONE = 1
@@ -28,7 +28,6 @@ func (this *LinkedBlockDequeTestSuite) SetupTest() {
 	this.deque = NewDeque(2)
 }
 
-
 func (this *LinkedBlockDequeTestSuite) TestAdd() {
 	this.deque = NewDeque(3)
 	this.deque.Add(ONE)
@@ -37,7 +36,6 @@ func (this *LinkedBlockDequeTestSuite) TestAdd() {
 	//fmt.Println(deque.Size())
 	assert.Equal(this.T(), 3, this.deque.Size(), "deque size != 3")
 }
-
 
 func (this *LinkedBlockDequeTestSuite) TestAddFirst() {
 	this.deque.AddFirst(ONE)
@@ -116,9 +114,9 @@ func (this *LinkedBlockDequeTestSuite) TestTakeLast() {
 	assert.Equal(this.T(), ONE, this.deque.TakeLast())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestRemoveLastOccurence()  {
-	assert.False(this.T(),this.deque.removeLastOccurrence(nil))
-	assert.False(this.T(),this.deque.removeLastOccurrence(ONE))
+func (this *LinkedBlockDequeTestSuite) TestRemoveLastOccurence() {
+	assert.False(this.T(), this.deque.removeLastOccurrence(nil))
+	assert.False(this.T(), this.deque.removeLastOccurrence(ONE))
 	this.deque.Add(ONE)
 	this.deque.Add(ONE)
 	fmt.Println(this.deque.Size())
@@ -141,8 +139,8 @@ func (this *LinkedBlockDequeTestSuite) TestInterrupt() {
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	go func() {
-		for i:=0;i<2;i++{
-			time.Sleep(time.Duration(1000)*time.Millisecond)
+		for i := 0; i < 2; i++ {
+			time.Sleep(time.Duration(1000) * time.Millisecond)
 			this.deque.InterruptTakeWaiters()
 			fmt.Println("TestInterrupt this.deque.InterruptTakeWaiters")
 			wait.Done()
@@ -158,12 +156,12 @@ func (this *LinkedBlockDequeTestSuite) TestIterator() {
 	this.deque.Add(TWO)
 	iterator := this.deque.Iterator()
 	var list []int
-	for iterator.HasNext(){
+	for iterator.HasNext() {
 		item := iterator.Next().(int)
-		list = append(list,item)
+		list = append(list, item)
 	}
 	//fmt.Println("list:",list)
-	assert.True(this.T(), reflect.DeepEqual(list,[]int{ONE,TWO}))
+	assert.True(this.T(), reflect.DeepEqual(list, []int{ONE, TWO}))
 }
 
 func (this *LinkedBlockDequeTestSuite) TestDescendingIterator() {
@@ -171,41 +169,41 @@ func (this *LinkedBlockDequeTestSuite) TestDescendingIterator() {
 	this.deque.Add(TWO)
 	iterator := this.deque.DescendingIterator()
 	var list []int
-	for iterator.HasNext(){
+	for iterator.HasNext() {
 		item := iterator.Next().(int)
-		list = append(list,item)
+		list = append(list, item)
 	}
 	//fmt.Println("list:",list)
-	assert.True(this.T(), reflect.DeepEqual(list,[]int{TWO, ONE}))
+	assert.True(this.T(), reflect.DeepEqual(list, []int{TWO, ONE}))
 }
 
 func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
-	count := 100;
+	count := 100
 	this.deque = NewDeque(count)
 
-	for i:=0;i < count;i++{
+	for i := 0; i < count; i++ {
 		this.deque.Add(i)
 	}
-	assert.Equal(this.T(),count, this.deque.Size())
+	assert.Equal(this.T(), count, this.deque.Size())
 	startWait := sync.WaitGroup{}
 	startWait.Add(1)
 
 	endWait := sync.WaitGroup{}
-	endWait.Add(count +1)
+	endWait.Add(count + 1)
 
 	counts := make(map[int]int32, count)
 	var hasErr int32 = 0
-	for i :=0;i < count;i++{
+	for i := 0; i < count; i++ {
 		go func(idx int) {
 			startWait.Wait()
 			iterator := this.deque.Iterator()
-			for iterator.HasNext(){
+			for iterator.HasNext() {
 				item := iterator.Next()
-				if(item == nil){
+				if item == nil {
 					hasErr = atomic.AddInt32(&hasErr, int32(1))
-				}else{
+				} else {
 					c := counts[idx]
-					counts[idx] = atomic.AddInt32(&c,int32(1))
+					counts[idx] = atomic.AddInt32(&c, int32(1))
 				}
 			}
 			endWait.Done()
@@ -214,13 +212,13 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	go func() {
 		startWait.Wait()
 		iterator := this.deque.Iterator()
-		c :=0
-		for iterator.HasNext(){
+		c := 0
+		for iterator.HasNext() {
 			iterator.Next()
-			if(c %2 == 1){
+			if c%2 == 1 {
 				iterator.Remove()
 			}
-			c = c+1
+			c = c + 1
 		}
 		endWait.Done()
 	}()
@@ -228,14 +226,14 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	endWait.Wait()
 	iterator := this.deque.Iterator()
 	var list []int
-	for iterator.HasNext(){
+	for iterator.HasNext() {
 		item := iterator.Next().(int)
-		list = append(list,item)
+		list = append(list, item)
 	}
 	//fmt.Println("list:",list)
 	//fmt.Println("counts:", counts)
-	assert.Equal(this.T(),count/2, this.deque.Size())
-	assert.Equal(this.T(),count/2, len(list))
+	assert.Equal(this.T(), count/2, this.deque.Size())
+	assert.Equal(this.T(), count/2, len(list))
 	assert.Equal(this.T(), int32(0), hasErr)
 }
 
@@ -251,33 +249,32 @@ func (this *LinkedBlockDequeTestSuite) TestQueueLock() {
 		this.deque.PutFirst(1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
-	val := <- ch
+	val := <-ch
 	this.Equal(1, val)
 }
-
 
 func (this *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 	this.deque = NewDeque(10)
 	ch := make(chan int)
 	count := 100
-	for i:=0;i<count;i++ {
+	for i := 0; i < count; i++ {
 		go func() {
 			ch <- this.deque.TakeFirst().(int)
 		}()
 	}
-	for i:=0;i<count;i++ {
+	for i := 0; i < count; i++ {
 		go func(val int) {
 			this.deque.PutLast(val)
 		}(i)
 	}
 	values := make([]int, count)
-	valueset := make(map[int]int,count)
-	for i:=0;i<count;i++ {
-		val := <- ch
+	valueset := make(map[int]int, count)
+	for i := 0; i < count; i++ {
+		val := <-ch
 		values[i] = val
 		valueset[val] = val
 	}
-	fmt.Println("TestQueueConcurrent",values)
+	fmt.Println("TestQueueConcurrent", values)
 	this.Equal(count, len(values))
 	this.Equal(count, len(valueset))
 	//this.Equal(1, val)

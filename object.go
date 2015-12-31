@@ -1,9 +1,10 @@
 package pool
+
 import (
 	"fmt"
-	"time"
-	"sync"
 	"github.com/jolestar/go-commons-pool/collections"
+	"sync"
+	"time"
 )
 
 type PooledObjectState int
@@ -24,7 +25,7 @@ const (
 type TrackedUse interface {
 	/**
 	Get the last time this object was used in ms.
-	 */
+	*/
 	GetLastUsed() int64
 }
 
@@ -44,7 +45,7 @@ type PooledObject struct {
 
 func NewPooledObject(object interface{}) *PooledObject {
 	time := currentTimeMillis()
-	return &PooledObject{Object:object, state:IDLE, CreateTime: time, LastUseTime:time, LastBorrowTime:time, LastReturnTime: time}
+	return &PooledObject{Object: object, state: IDLE, CreateTime: time, LastUseTime: time, LastBorrowTime: time, LastReturnTime: time}
 }
 
 func currentTimeMillis() int64 {
@@ -75,11 +76,11 @@ func (this *PooledObject) GetIdleTimeMillis() int64 {
 }
 
 func (this *PooledObject) GetLastUsedTime() int64 {
-	trackedUse,ok := this.Object.(TrackedUse)
-	if (ok) {
-		if(trackedUse.GetLastUsed() > this.LastUseTime){
+	trackedUse, ok := this.Object.(TrackedUse)
+	if ok {
+		if trackedUse.GetLastUsed() > this.LastUseTime {
 			return trackedUse.GetLastUsed()
-		}else{
+		} else {
 			return this.LastUseTime
 		}
 	}
@@ -116,7 +117,7 @@ func (this *PooledObject) Allocate() bool {
 
 func (this *PooledObject) doDeallocate() bool {
 	if this.state == ALLOCATED ||
-	this.state == RETURNING {
+		this.state == RETURNING {
 		this.state = IDLE
 		this.LastReturnTime = currentTimeMillis()
 		//borrowedBy = nil;
@@ -156,7 +157,7 @@ func (this *PooledObject) MarkAbandoned() {
 	this.lock.Unlock()
 }
 
-func (this *PooledObject) markAbandoned()  {
+func (this *PooledObject) markAbandoned() {
 	this.state = ABANDONED
 }
 

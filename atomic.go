@@ -1,4 +1,5 @@
 package pool
+
 import "sync/atomic"
 
 type AtomicInteger int32
@@ -23,7 +24,6 @@ func (this *AtomicInteger) GetAndDecrement() int32 {
 	return ret
 }
 
-func (this AtomicInteger) Get() int32  {
+func (this AtomicInteger) Get() int32 {
 	return int32(this)
 }
-

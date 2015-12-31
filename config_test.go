@@ -1,10 +1,10 @@
 package pool
-import (
-"github.com/stretchr/testify/assert"
-"testing"
-	"fmt"
-)
 
+import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func TestPoolConfig(t *testing.T) {
 	config := NewDefaultPoolConfig()
@@ -12,12 +12,12 @@ func TestPoolConfig(t *testing.T) {
 	assert.NotNil(t, config)
 }
 
-func TestGetEvictionPolicy(t *testing.T)  {
+func TestGetEvictionPolicy(t *testing.T) {
 	policy := GetEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME)
 	assert.NotNil(t, policy)
 }
 
-func TestDefaultConfig(t *testing.T)  {
+func TestDefaultConfig(t *testing.T) {
 	config := NewDefaultPoolConfig()
 	assert.Equal(t, DEFAULT_BLOCK_WHEN_EXHAUSTED, config.BlockWhenExhausted)
 	assert.Equal(t, DEFAULT_EVICTION_POLICY_NAME, config.EvictionPolicyName)

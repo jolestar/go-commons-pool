@@ -1,9 +1,10 @@
 package collections
+
 import (
-"sync"
-"time"
-"testing"
 	"fmt"
+	"sync"
+	"testing"
+	"time"
 )
 
 type LockTestObject struct {
@@ -13,23 +14,23 @@ type LockTestObject struct {
 
 func NewLockTestObject() *LockTestObject {
 	lock := new(sync.Mutex)
-	return &LockTestObject{lock:lock, cond:NewTimeoutCond(lock)}
+	return &LockTestObject{lock: lock, cond: NewTimeoutCond(lock)}
 }
 
-func (this *LockTestObject) lockAndWaitWithTimeout(timeout time.Duration)  {
+func (this *LockTestObject) lockAndWaitWithTimeout(timeout time.Duration) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.cond.WaitWithTimeout(timeout)
 }
 
-func (this *LockTestObject) lockAndWait()  {
+func (this *LockTestObject) lockAndWait() {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	fmt.Println("lockAndWait")
 	this.cond.Wait()
 }
 
-func (this *LockTestObject) lockAndNotify()  {
+func (this *LockTestObject) lockAndNotify() {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	fmt.Println("lockAndNotify")
@@ -44,7 +45,7 @@ func TestTimeoutCondWait(t *testing.T) {
 		obj.lockAndWait()
 		wait.Done()
 	}()
-	time.Sleep(time.Duration(50)*time.Millisecond)
+	time.Sleep(time.Duration(50) * time.Millisecond)
 	go func() {
 		obj.lockAndNotify()
 		wait.Done()
@@ -57,10 +58,10 @@ func TestTimeoutCondWaitTimeout(t *testing.T) {
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	go func() {
-		obj.lockAndWaitWithTimeout(time.Duration(2)*time.Second)
+		obj.lockAndWaitWithTimeout(time.Duration(2) * time.Second)
 		wait.Done()
 	}()
-	time.Sleep(time.Duration(50)*time.Millisecond)
+	time.Sleep(time.Duration(50) * time.Millisecond)
 	go func() {
 		obj.lockAndNotify()
 		wait.Done()

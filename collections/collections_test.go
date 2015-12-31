@@ -1,22 +1,23 @@
 package collections
+
 import (
-	"testing"
 	"github.com/stretchr/testify/assert"
 	"sync"
+	"testing"
 )
 
 type HashableObject struct {
 	str string
-	i int
-	b bool
+	i   int
+	b   bool
 }
 
-type UnhashableObject struct{
-	str string
-	i int
-	b bool
+type UnhashableObject struct {
+	str  string
+	i    int
+	b    bool
 	strs []string
-	m map[string]int
+	m    map[string]int
 }
 
 func TestSyncMapString(t *testing.T) {
@@ -48,7 +49,7 @@ func TestSyncMapHashableObject2(t *testing.T) {
 	assert.Equal(t, "value1", m.Get(&o1))
 
 	o2 := HashableObject{}
-	assert.Nil(t,m.Get(&o2))
+	assert.Nil(t, m.Get(&o2))
 }
 
 func TestSyncMapHashableObject3(t *testing.T) {
@@ -70,7 +71,7 @@ func TestSyncMapUnhashableObject(t *testing.T) {
 	assert.Equal(t, "value1", m.Get(&o1))
 }
 
-func TestMultiThread(t *testing.T)  {
+func TestMultiThread(t *testing.T) {
 	m := NewSyncMap()
 	wait := sync.WaitGroup{}
 	wait.Add(1000)
@@ -84,4 +85,3 @@ func TestMultiThread(t *testing.T)  {
 	wait.Wait()
 	assert.Equal(t, 1000, m.Size())
 }
-
