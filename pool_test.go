@@ -173,13 +173,13 @@ func (this *PoolTestSuite) assertNil(object interface{}) {
 	this.Nil(object)
 }
 
-func (this *PoolTestSuite) NoErrorWithResult(object interface{}, err error) (interface{}){
+func (this *PoolTestSuite) NoErrorWithResult(object interface{}, err error) interface{} {
 	this.NotNil(object)
 	this.Nil(err)
 	return object
 }
 
-func (this *PoolTestSuite) ErrorWithResult(object interface{}, err error) (error){
+func (this *PoolTestSuite) ErrorWithResult(object interface{}, err error) error {
 	this.Nil(object)
 	this.NotNil(err)
 	return err
@@ -320,7 +320,7 @@ func (this *PoolTestSuite) TestBaseClear() {
 
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
-	obj0  := this.NoErrorWithResult(this.pool.BorrowObject())
+	obj0 := this.NoErrorWithResult(this.pool.BorrowObject())
 	obj1 := this.NoErrorWithResult(this.pool.BorrowObject())
 	this.assertEquals(2, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
@@ -331,7 +331,7 @@ func (this *PoolTestSuite) TestBaseClear() {
 	this.pool.Clear()
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
-	obj2  := this.NoErrorWithResult(this.pool.BorrowObject())
+	obj2 := this.NoErrorWithResult(this.pool.BorrowObject())
 	this.assertEquals(getNthObject(2), obj2)
 }
 
@@ -482,11 +482,11 @@ type TestRunnable struct {
 	error    error
 }
 
-func NewTestThreadSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestRunnable {
-	return NewTestThread(pool, iter, delay, delay, randomDelay, nil)
+func NewTestRunnableSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestRunnable {
+	return NewTestRunnable(pool, iter, delay, delay, randomDelay, nil)
 }
 
-func NewTestThread(pool *ObjectPool, iter int, startDelay int,
+func NewTestRunnable(pool *ObjectPool, iter int, startDelay int,
 	holdTime int, randomDelay bool, obj interface{}) *TestRunnable {
 	return &TestRunnable{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
 }
@@ -541,7 +541,7 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	this.pool.BorrowObject() // numActive = 1, numIdle = 0
 	// Create a test thread that will run once and try a borrow after
 	// 150ms fixed delay
-	borrower := NewTestThreadSimple(this.pool, 1, 150, false)
+	borrower := NewTestRunnableSimple(this.pool, 1, 150, false)
 	borrowerThread := NewThreadWithRunnable(borrower)
 	//// Set evictor to run in 100 ms - will create idle instance
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
@@ -790,3 +790,63 @@ func (this *PoolTestSuite) TestTimeoutNoLeak() {
 	this.NoErrorWithResult(this.pool.BorrowObject())
 	this.NoErrorWithResult(this.pool.BorrowObject())
 }
+
+func (this *PoolTestSuite) TestMaxTotalZero() {
+	this.pool.Config.MaxTotal = 0
+	this.pool.Config.BlockWhenExhausted = false
+	err := this.ErrorWithResult(this.pool.BorrowObject())
+	this.Error(err)
+	//fail("Expected NoSuchElementException");
+}
+
+func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
+	// Config
+	numThreads := 199 // And main thread makes a round 200.
+	numIter := 20
+	delay := 25
+	maxTotal := 10
+
+	this.factory.maxTotal = maxTotal
+	this.pool.Config.MaxTotal = maxTotal
+	this.pool.Config.BlockWhenExhausted = true
+	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(-1)
+
+	// Start threads to borrow objects
+	threads := make([]*TestRunnable, numThreads)
+	for i := 0; i < numThreads; i++ {
+		// Factor of 2 on iterations so main thread does work whilst other
+		// threads are running. Factor of 2 on delay so average delay for
+		// other threads == actual delay for main thread
+		threads[i] = NewTestRunnableSimple(this.pool, numIter*2, delay*2, true)
+		t := NewThreadWithRunnable(threads[i])
+		t.Start()
+	}
+	// Give the threads a chance to start doing some work
+	time.Sleep(time.Duration(5000) * time.Millisecond)
+
+	for i := 0; i < numIter; i++ {
+		var obj interface{}
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+
+		obj, err := this.pool.BorrowObject()
+		this.NoError(err)
+		// Under load, observed _numActive > _maxTotal
+		if this.pool.GetNumActive() > this.pool.Config.MaxTotal {
+			this.Fail("Too many active objects")
+		}
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		if obj != nil {
+			this.pool.ReturnObject(obj)
+		}
+	}
+
+	for i := 0; i < numThreads; i++ {
+		for !(threads[i]).complete {
+			time.Sleep(time.Duration(500) * time.Millisecond)
+		}
+		if threads[i].failed {
+			this.Fail("Thread %v failed: %v" , i,threads[i].error.Error())
+		}
+	}
+}
+
