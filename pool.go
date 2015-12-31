@@ -168,9 +168,9 @@ func (this *ObjectPool) doDestroy(toDestroy *PooledObject, inLock bool) {
 		fmt.Printf("pool destroy %v \n", toDestroy.Object)
 	}
 	//golang has not recursive lock, so ...
-	if(inLock){
+	if inLock {
 		toDestroy.invalidate()
-	}else {
+	} else {
 		toDestroy.Invalidate()
 	}
 	this.idleObjects.Remove(toDestroy)
@@ -564,7 +564,7 @@ func (this *ObjectPool) evict() {
 			evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
 
 			if evict {
-				if(debug_pool){
+				if debug_pool {
 					fmt.Printf("pool evict %v \n", underTest.Object)
 				}
 				this.destroy(underTest)

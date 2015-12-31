@@ -627,7 +627,7 @@ func (this *PoolTestSuite) checkEvictionOrderPart1(lifo bool) {
 	this.pool.Config.Lifo = lifo
 	for i := 0; i < 5; i++ {
 		this.pool.AddObject()
-		time.Sleep(time.Duration(100)*time.Millisecond)
+		time.Sleep(time.Duration(100) * time.Millisecond)
 	}
 	// Order, oldest to youngest, is "0", "1", ...,"4"
 	this.pool.evict() // Should evict "0" and "1"
@@ -651,7 +651,7 @@ func (this *PoolTestSuite) checkEvictionOrderPart2(lifo bool) {
 	this.pool.Config.Lifo = lifo
 	for i := 0; i < 5; i++ {
 		this.pool.AddObject()
-		time.Sleep(time.Duration(100)*time.Millisecond)
+		time.Sleep(time.Duration(100) * time.Millisecond)
 	}
 	this.pool.evict() // Should evict "0" and "1"
 	this.pool.evict() // Should evict "2" and "3"
@@ -1134,10 +1134,10 @@ func (this *PoolTestSuite) TestConcurrentInvalidate() {
 		for i := 0; i < nThreads; i++ {
 			go func(pool *ObjectPool, obj *TestObject) {
 				err := pool.InvalidateObject(obj)
-				_,ok := err.(*IllegalStatusErr)
+				_, ok := err.(*IllegalStatusErr)
 				if err != nil && !ok {
 					results <- false
-					fmt.Printf("TestConcurrentInvalidate InvalidateObject error:%v, obj: %v \n",err, obj)
+					fmt.Printf("TestConcurrentInvalidate InvalidateObject error:%v, obj: %v \n", err, obj)
 				} else {
 					results <- true
 				}
