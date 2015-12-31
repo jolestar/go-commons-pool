@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	debug = true
+	debug_pool = true
 )
 
 type baseErr struct {
@@ -102,6 +102,10 @@ func (this *ObjectPool) GetNumActive() int {
 	return this.allObjects.Size() - this.idleObjects.Size()
 }
 
+func (this *ObjectPool) GetDestroyedCount() int {
+	return int(this.destroyedCount.Get())
+}
+
 func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 	// Generate a list of abandoned objects to remove
 	now := currentTimeMillis()
@@ -129,7 +133,7 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 }
 
 func (this *ObjectPool) create() *PooledObject {
-	if debug {
+	if debug_pool {
 		fmt.Printf("pool create\n")
 	}
 	localMaxTotal := this.Config.MaxTotal
@@ -156,10 +160,19 @@ func (this *ObjectPool) create() *PooledObject {
 }
 
 func (this *ObjectPool) destroy(toDestroy *PooledObject) {
-	if debug {
-		fmt.Printf("pool destroy %v \n", toDestroy)
+	this.doDestroy(toDestroy, false)
+}
+
+func (this *ObjectPool) doDestroy(toDestroy *PooledObject, inLock bool) {
+	if debug_pool {
+		fmt.Printf("pool destroy %v \n", toDestroy.Object)
 	}
-	toDestroy.Invalidate()
+	//golang has not recursive lock, so ...
+	if(inLock){
+		toDestroy.invalidate()
+	}else {
+		toDestroy.Invalidate()
+	}
 	this.idleObjects.Remove(toDestroy)
 	this.allObjects.Remove(toDestroy.Object)
 	this.factory.DestroyObject(toDestroy)
@@ -208,7 +221,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 					ok = true
 				}
 			}
-			if debug {
+			if debug_pool {
 				fmt.Printf("pool create: %v, borrowMaxWaitMillis: %v, ok:%v,  p:%v \n", create, borrowMaxWaitMillis, ok, p)
 			}
 			if p == nil {
@@ -218,7 +231,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 					p, ok = this.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond).(*PooledObject)
 				}
 			}
-			if debug {
+			if debug_pool {
 				fmt.Printf("pool ok:%v,  p:%v \n", ok, p)
 			}
 			if !ok {
@@ -227,7 +240,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 			if !p.Allocate() {
 				p = nil
 			}
-			if debug {
+			if debug_pool {
 				fmt.Printf("pool p.Allocate p:%v \n", p)
 			}
 		} else {
@@ -249,7 +262,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if p != nil {
 			e := this.factory.ActivateObject(p)
 			if e != nil {
-				if debug {
+				if debug_pool {
 					fmt.Printf("pool ActiveObject fail:%v \n", e)
 				}
 				this.destroy(p)
@@ -259,7 +272,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				}
 			}
 		}
-		if debug {
+		if debug_pool {
 			fmt.Printf("pool ActiveObject end %v \n", p)
 		}
 		if p != nil && (this.Config.TestOnBorrow || create && this.Config.TestOnCreate) {
@@ -276,7 +289,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	}
 
 	this.updateStatsBorrow(p, currentTimeMillis()-waitTime)
-	if debug {
+	if debug_pool {
 		fmt.Printf("pool borrowObject p:%v ,p.Object:%v \n", p, p.Object)
 	}
 	return p.Object, nil
@@ -319,7 +332,7 @@ func (this *ObjectPool) IsClosed() bool {
 }
 
 func (this *ObjectPool) ReturnObject(object interface{}) error {
-	if debug {
+	if debug_pool {
 		fmt.Printf("pool ReturnObject %v \n", object)
 	}
 	if object == nil {
@@ -411,9 +424,11 @@ func (this *ObjectPool) InvalidateObject(object interface{}) error {
 				"Invalidated object not currently part of this pool")
 		}
 	}
-	if p.GetState() != INVALID {
-		this.destroy(p)
+	p.lock.Lock()
+	if p.state != INVALID {
+		this.doDestroy(p, true)
 	}
+	p.lock.Unlock()
 	this.ensureIdle(1, false)
 	return nil
 }
@@ -503,7 +518,7 @@ func (this *ObjectPool) getMinIdle() int {
 }
 
 func (this *ObjectPool) evict() {
-	if debug {
+	if debug_pool {
 		fmt.Printf("pool evict idle: %v \n", this.idleObjects.Size())
 	}
 	if this.idleObjects.Size() > 0 {
@@ -516,7 +531,6 @@ func (this *ObjectPool) evict() {
 			MinIdle:           this.Config.MinIdle}
 
 		testWhileIdle := this.Config.TestWhileIdle
-
 		for i, m := 0, this.getNumTests(); i < m; i++ {
 			if this.evictionIterator == nil || !this.evictionIterator.HasNext() {
 				this.evictionIterator = this.EvictionIterator()
@@ -550,6 +564,9 @@ func (this *ObjectPool) evict() {
 			evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
 
 			if evict {
+				if(debug_pool){
+					fmt.Printf("pool evict %v \n", underTest.Object)
+				}
 				this.destroy(underTest)
 				this.destroyedByEvictorCount.IncrementAndGet()
 			} else {

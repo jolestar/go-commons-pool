@@ -28,7 +28,8 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS, config.MinEvictableIdleTimeMillis)
 	assert.Equal(t, DEFAULT_MIN_IDLE, config.MinIdle)
 	assert.Equal(t, DEFAULT_NUM_TESTS_PER_EVICTION_RUN, config.NumTestsPerEvictionRun)
-	assert.Equal(t, DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS, config.SoftMinEvictableIdleTimeMillis)
+	//assert.Equal bug, math.MaxInt64 not equal
+	assert.True(t, DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS == config.SoftMinEvictableIdleTimeMillis)
 	assert.Equal(t, DEFAULT_TEST_ON_BORROW, config.TestOnBorrow)
 	assert.Equal(t, DEFAULT_TEST_ON_CREATE, config.TestOnCreate)
 	assert.Equal(t, DEFAULT_TEST_ON_RETURN, config.TestOnReturn)

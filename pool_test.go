@@ -13,8 +13,12 @@ import (
 )
 
 type TestObject struct {
-	num int
+	Num int
 }
+
+const (
+	debug_simple_facotry = false
+)
 
 type SimpleFactory struct {
 	makeCounter          int
@@ -48,7 +52,9 @@ func (this *SimpleFactory) doWait(latency time.Duration) {
 }
 
 func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
-	fmt.Println("factory MakeObject")
+	if debug_simple_facotry {
+		fmt.Println("factory MakeObject")
+	}
 	var waitLatency int64
 	this.lock.Lock()
 	this.activeCount = this.activeCount + 1
@@ -65,11 +71,13 @@ func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
 	counter = this.makeCounter
 	this.makeCounter = this.makeCounter + 1
 	this.lock.Unlock()
-	return NewPooledObject(&TestObject{num: counter}), nil
+	return NewPooledObject(&TestObject{Num: counter}), nil
 }
 
 func (this *SimpleFactory) DestroyObject(object *PooledObject) error {
-	fmt.Println("factory DestroyObject")
+	if debug_simple_facotry {
+		fmt.Println("factory DestroyObject")
+	}
 	var waitLatency int64
 	var hurl bool
 	this.lock.Lock()
@@ -89,7 +97,9 @@ func (this *SimpleFactory) DestroyObject(object *PooledObject) error {
 }
 
 func (this *SimpleFactory) ValidateObject(object *PooledObject) bool {
-	fmt.Println("factory ValidateObject")
+	if debug_simple_facotry {
+		fmt.Println("factory ValidateObject")
+	}
 	var validate bool
 	var evenTest bool
 	var oddTest bool
@@ -117,8 +127,10 @@ func (this *SimpleFactory) ValidateObject(object *PooledObject) bool {
 }
 
 func (this *SimpleFactory) ActivateObject(object *PooledObject) error {
-	fmt.Println("factory ActivateObject")
-	defer fmt.Println("factory ActivateObject end")
+	if debug_simple_facotry {
+		fmt.Println("factory ActivateObject")
+		defer fmt.Println("factory ActivateObject end")
+	}
 	var hurl bool
 	var evenTest bool
 	var oddTest bool
@@ -145,7 +157,9 @@ func (this *SimpleFactory) ActivateObject(object *PooledObject) error {
 }
 
 func (this *SimpleFactory) PassivateObject(object *PooledObject) error {
-	fmt.Println("factory PassivateObject")
+	if debug_simple_facotry {
+		fmt.Println("factory PassivateObject")
+	}
 	var hurl bool
 	this.lock.Lock()
 	hurl = this.exceptionOnPassivate
@@ -208,7 +222,7 @@ func (this *PoolTestSuite) makeEmptyPool(maxTotal int) {
 }
 
 func getNthObject(num int) *TestObject {
-	return &TestObject{num: num}
+	return &TestObject{Num: num}
 }
 
 func (this *PoolTestSuite) TestBaseBorrow() {
@@ -613,7 +627,7 @@ func (this *PoolTestSuite) checkEvictionOrderPart1(lifo bool) {
 	this.pool.Config.Lifo = lifo
 	for i := 0; i < 5; i++ {
 		this.pool.AddObject()
-		time.Sleep(100)
+		time.Sleep(time.Duration(100)*time.Millisecond)
 	}
 	// Order, oldest to youngest, is "0", "1", ...,"4"
 	this.pool.evict() // Should evict "0" and "1"
@@ -637,7 +651,7 @@ func (this *PoolTestSuite) checkEvictionOrderPart2(lifo bool) {
 	this.pool.Config.Lifo = lifo
 	for i := 0; i < 5; i++ {
 		this.pool.AddObject()
-		time.Sleep(100)
+		time.Sleep(time.Duration(100)*time.Millisecond)
 	}
 	this.pool.evict() // Should evict "0" and "1"
 	this.pool.evict() // Should evict "2" and "3"
@@ -1018,4 +1032,121 @@ func (this *PoolTestSuite) TestEvictionPolicy() {
 	// all of the idle objects.
 	time.Sleep(time.Duration(2000) * time.Millisecond)
 	this.Equal(0, this.pool.GetNumIdle(), "Should be 0 idle")
+}
+
+func (this *PoolTestSuite) TestEvictionSoftMinIdle() {
+
+	this.pool.Config.MaxIdle = 5
+	this.pool.Config.MaxTotal = 5
+	this.pool.Config.NumTestsPerEvictionRun = 5
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(3000)
+	this.pool.Config.SoftMinEvictableIdleTimeMillis = int64(1000)
+	this.pool.Config.MinIdle = 2
+
+	active := make([]*TestObject, 5)
+	for i := 0; i < 5; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+
+	for i := 0; i < 5; i++ {
+		this.pool.ReturnObject(active[i])
+	}
+
+	// Soft evict all but minIdle(2)
+	time.Sleep(time.Duration(1500) * time.Millisecond)
+	this.pool.evict()
+	this.Equal(2, this.pool.GetNumIdle(), "Idle count different than expected.")
+
+	// Hard evict the rest.
+	time.Sleep(time.Duration(1500) * time.Millisecond)
+	this.pool.evict()
+	this.Equal(0, this.pool.GetNumIdle(), "Idle count different than expected.")
+}
+
+func (this *PoolTestSuite) TestEvictionInvalid() {
+	this.pool = NewObjectPoolWithDefaultConfig(NewPooledObjectFactory(
+		func() (interface{}, error) {
+			return &TestObject{}, nil
+		}, nil, func(object *PooledObject) bool {
+			fmt.Printf("TestEvictionInvalid valid object %v \n", object)
+			time.Sleep(time.Duration(1000) * time.Millisecond)
+			return false
+		}, nil, nil))
+
+	this.pool.Config.MaxIdle = 1
+	this.pool.Config.MaxTotal = 1
+	this.pool.Config.TestOnBorrow = false
+	this.pool.Config.TestOnReturn = false
+	this.pool.Config.TestWhileIdle = true
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(100000)
+	this.pool.Config.NumTestsPerEvictionRun = 1
+
+	p := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.NoError(this.pool.ReturnObject(p))
+
+	// Run eviction in a separate thread
+	go func() {
+		fmt.Println("TestEvictionInvalid evict thread.")
+		this.pool.evict()
+	}()
+
+	// Sleep to make sure evictor has started
+	time.Sleep(time.Duration(300) * time.Millisecond)
+
+	err := this.ErrorWithResult(this.pool.borrowObject(1))
+	_, ok := err.(*NoSuchElementErr)
+	this.True(ok, "expect NoSuchElementErr, but get %v", reflect.TypeOf(ok))
+
+	// Make sure evictor has finished
+	time.Sleep(time.Duration(1000) * time.Millisecond)
+	// Should have an empty pool
+	this.Equal(0, this.pool.GetNumIdle(), "Idle count different than expected.")
+	this.Equal(0, this.pool.GetNumActive(), "Total count different than expected.")
+}
+
+func (this *PoolTestSuite) TestConcurrentInvalidate() {
+	// Get allObjects and idleObjects loaded with some instances
+	nObjects := 1000
+	this.pool.Config.MaxTotal = nObjects
+	this.pool.Config.MaxIdle = nObjects
+	active := make([]*TestObject, nObjects)
+	for i := 0; i < nObjects; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	for i := 0; i < nObjects; i++ {
+		if i%2 == 0 {
+			this.NoError(this.pool.ReturnObject(active[i]))
+		}
+	}
+	nThreads := 20
+	nIterations := 60
+	// Randomly generated list of distinct invalidation targets
+	targets := make(map[int]bool)
+	for j := 0; j < nIterations; j++ {
+		// Get a random invalidation target
+		targ := rand.Intn(nObjects)
+		for targets[targ] {
+			targ = rand.Intn(nObjects)
+		}
+		targets[targ] = true
+		// Launch nThreads threads all trying to invalidate the target
+		results := make(chan bool, nThreads)
+		for i := 0; i < nThreads; i++ {
+			go func(pool *ObjectPool, obj *TestObject) {
+				err := pool.InvalidateObject(obj)
+				_,ok := err.(*IllegalStatusErr)
+				if err != nil && !ok {
+					results <- false
+					fmt.Printf("TestConcurrentInvalidate InvalidateObject error:%v, obj: %v \n",err, obj)
+				} else {
+					results <- true
+				}
+			}(this.pool, active[targ])
+		}
+		for i := 0; i < nThreads; i++ {
+			done := <-results
+			this.True(done)
+		}
+	}
+	this.Equal(nIterations, this.pool.GetDestroyedCount())
 }

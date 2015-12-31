@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	debug_queue = true
+	debug_queue = false
 )
 
 type Node struct {

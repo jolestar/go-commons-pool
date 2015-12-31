@@ -10,7 +10,7 @@ import (
 func TestDefaultPooledObjectFactory(t *testing.T) {
 	factory := NewPooledObjectFactorySimple(
 		func() (interface{}, error) {
-			return &TestObject{num: rand.Int()}, nil
+			return &TestObject{Num: rand.Int()}, nil
 		})
 
 	assert.NotNil(t, factory)

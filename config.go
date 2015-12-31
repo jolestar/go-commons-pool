@@ -3,6 +3,7 @@ package pool
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 )
 
@@ -14,7 +15,7 @@ const (
 	//DEFAULT_FAIRNESS = false
 	DEFAULT_MAX_WAIT_MILLIS                     = int64(-1)
 	DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS      = int64(1000 * 60 * 30)
-	DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS = int64(-1)
+	DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS = math.MaxInt64
 	DEFAULT_NUM_TESTS_PER_EVICTION_RUN          = 3
 	DEFAULT_TEST_ON_CREATE                      = false
 	DEFAULT_TEST_ON_BORROW                      = false
@@ -101,9 +102,11 @@ type DefaultEvictionPolicy struct {
 }
 
 func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
-	if (config.IdleSoftEvictTime < underTest.GetIdleTimeMillis() &&
+	idleTime := underTest.GetIdleTimeMillis()
+
+	if (config.IdleSoftEvictTime < idleTime &&
 		config.MinIdle < idleCount) ||
-		config.IdleEvictTime < underTest.GetIdleTimeMillis() {
+		config.IdleEvictTime < idleTime {
 		return true
 	}
 	return false

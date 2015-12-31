@@ -135,8 +135,12 @@ func (this *PooledObject) Deallocate() bool {
 
 func (this *PooledObject) Invalidate() {
 	this.lock.Lock()
-	this.state = INVALID
+	this.invalidate()
 	this.lock.Unlock()
+}
+
+func (this *PooledObject) invalidate() {
+	this.state = INVALID
 }
 
 func (this *PooledObject) Use() {
