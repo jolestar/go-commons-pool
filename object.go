@@ -152,8 +152,12 @@ func (this *PooledObject) GetState() PooledObjectState {
 
 func (this *PooledObject) MarkAbandoned() {
 	this.lock.Lock()
-	this.state = ABANDONED
+	this.markAbandoned()
 	this.lock.Unlock()
+}
+
+func (this *PooledObject) markAbandoned()  {
+	this.state = ABANDONED
 }
 
 func (this *PooledObject) MarkReturning() {

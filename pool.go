@@ -106,7 +106,7 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 		pooledObject.lock.Lock()
 		if pooledObject.state == ALLOCATED &&
 			pooledObject.GetLastUsedTime() <= timeout {
-			pooledObject.MarkAbandoned()
+			pooledObject.markAbandoned()
 			remove = append(remove, pooledObject)
 		}
 		pooledObject.lock.Unlock()
