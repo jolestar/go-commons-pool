@@ -24,169 +24,169 @@ func TestLinkedBlockQueueTestSuite(t *testing.T) {
 	suite.Run(t, new(LinkedBlockDequeTestSuite))
 }
 
-func (suite *LinkedBlockDequeTestSuite) SetupTest() {
-	suite.deque = NewDeque(2)
+func (this *LinkedBlockDequeTestSuite) SetupTest() {
+	this.deque = NewDeque(2)
 }
 
 
-func (suite *LinkedBlockDequeTestSuite) TestAdd() {
-	suite.deque = NewDeque(3)
-	suite.deque.Add(ONE)
-	suite.deque.Add(TWO)
-	suite.deque.Add(THREE)
+func (this *LinkedBlockDequeTestSuite) TestAdd() {
+	this.deque = NewDeque(3)
+	this.deque.Add(ONE)
+	this.deque.Add(TWO)
+	this.deque.Add(THREE)
 	//fmt.Println(deque.Size())
-	assert.Equal(suite.T(), 3, suite.deque.Size(), "deque size != 3")
+	assert.Equal(this.T(), 3, this.deque.Size(), "deque size != 3")
 }
 
 
-func (suite *LinkedBlockDequeTestSuite) TestAddFirst() {
-	suite.deque.AddFirst(ONE)
-	suite.deque.AddFirst(TWO)
+func (this *LinkedBlockDequeTestSuite) TestAddFirst() {
+	this.deque.AddFirst(ONE)
+	this.deque.AddFirst(TWO)
 	//fmt.Println(deque.Size())
-	assert.Equal(suite.T(), 2, suite.deque.Size(), "deque size != 2")
-	e := suite.deque.AddFirst(THREE)
-	assert.NotNil(suite.T(), e, "deque can not add three element")
-	assert.Equal(suite.T(), TWO, suite.deque.Pop())
+	assert.Equal(this.T(), 2, this.deque.Size(), "deque size != 2")
+	e := this.deque.AddFirst(THREE)
+	assert.NotNil(this.T(), e, "deque can not add three element")
+	assert.Equal(this.T(), TWO, this.deque.Pop())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestAddLast() {
-	suite.deque.AddLast(ONE)
-	suite.deque.AddLast(TWO)
-	assert.Equal(suite.T(), 2, suite.deque.Size())
-	e := suite.deque.AddLast(THREE)
-	assert.NotNil(suite.T(), e, "deque can not add three element")
-	assert.Equal(suite.T(), ONE, suite.deque.Pop())
+func (this *LinkedBlockDequeTestSuite) TestAddLast() {
+	this.deque.AddLast(ONE)
+	this.deque.AddLast(TWO)
+	assert.Equal(this.T(), 2, this.deque.Size())
+	e := this.deque.AddLast(THREE)
+	assert.NotNil(this.T(), e, "deque can not add three element")
+	assert.Equal(this.T(), ONE, this.deque.Pop())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestOfferFirst() {
-	suite.deque.OfferFirst(ONE)
-	suite.deque.OfferFirst(TWO)
-	assert.Equal(suite.T(), 2, suite.deque.Size())
-	suite.deque.OfferFirst(nil)
-	assert.Equal(suite.T(), TWO, suite.deque.Pop())
+func (this *LinkedBlockDequeTestSuite) TestOfferFirst() {
+	this.deque.OfferFirst(ONE)
+	this.deque.OfferFirst(TWO)
+	assert.Equal(this.T(), 2, this.deque.Size())
+	this.deque.OfferFirst(nil)
+	assert.Equal(this.T(), TWO, this.deque.Pop())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestOfferLast() {
-	suite.deque.OfferLast(ONE)
-	suite.deque.OfferLast(TWO)
-	assert.Equal(suite.T(), 2, suite.deque.Size())
-	suite.deque.OfferLast(nil)
-	assert.Equal(suite.T(), ONE, suite.deque.Pop())
+func (this *LinkedBlockDequeTestSuite) TestOfferLast() {
+	this.deque.OfferLast(ONE)
+	this.deque.OfferLast(TWO)
+	assert.Equal(this.T(), 2, this.deque.Size())
+	this.deque.OfferLast(nil)
+	assert.Equal(this.T(), ONE, this.deque.Pop())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestPutFirst() {
-	suite.deque.PutFirst(nil)
-	suite.deque.PutFirst(ONE)
-	suite.deque.PutFirst(TWO)
-	assert.Equal(suite.T(), 2, suite.deque.Size())
-	assert.Equal(suite.T(), TWO, suite.deque.Pop())
+func (this *LinkedBlockDequeTestSuite) TestPutFirst() {
+	this.deque.PutFirst(nil)
+	this.deque.PutFirst(ONE)
+	this.deque.PutFirst(TWO)
+	assert.Equal(this.T(), 2, this.deque.Size())
+	assert.Equal(this.T(), TWO, this.deque.Pop())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestPutLast() {
-	suite.deque.PutLast(nil)
-	suite.deque.PutLast(ONE)
-	suite.deque.PutLast(TWO)
-	assert.Equal(suite.T(), 2, suite.deque.Size())
-	assert.Equal(suite.T(), ONE, suite.deque.Pop())
+func (this *LinkedBlockDequeTestSuite) TestPutLast() {
+	this.deque.PutLast(nil)
+	this.deque.PutLast(ONE)
+	this.deque.PutLast(TWO)
+	assert.Equal(this.T(), 2, this.deque.Size())
+	assert.Equal(this.T(), ONE, this.deque.Pop())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestPollFirst() {
-	assert.Nil(suite.T(), suite.deque.PollFirst())
-	assert.True(suite.T(), suite.deque.OfferFirst(ONE))
-	assert.True(suite.T(), suite.deque.OfferFirst(TWO))
-	assert.Equal(suite.T(), TWO, suite.deque.PollFirst())
+func (this *LinkedBlockDequeTestSuite) TestPollFirst() {
+	assert.Nil(this.T(), this.deque.PollFirst())
+	assert.True(this.T(), this.deque.OfferFirst(ONE))
+	assert.True(this.T(), this.deque.OfferFirst(TWO))
+	assert.Equal(this.T(), TWO, this.deque.PollFirst())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestPollLast() {
-	assert.Nil(suite.T(), suite.deque.PollLast())
-	assert.True(suite.T(), suite.deque.OfferFirst(ONE))
-	assert.True(suite.T(), suite.deque.OfferFirst(TWO))
-	assert.Equal(suite.T(), ONE, suite.deque.PollLast())
+func (this *LinkedBlockDequeTestSuite) TestPollLast() {
+	assert.Nil(this.T(), this.deque.PollLast())
+	assert.True(this.T(), this.deque.OfferFirst(ONE))
+	assert.True(this.T(), this.deque.OfferFirst(TWO))
+	assert.Equal(this.T(), ONE, this.deque.PollLast())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestTakeFirst() {
-	assert.True(suite.T(), suite.deque.OfferFirst(ONE))
-	assert.True(suite.T(), suite.deque.OfferFirst(TWO))
-	assert.Equal(suite.T(), TWO, suite.deque.TakeFirst())
+func (this *LinkedBlockDequeTestSuite) TestTakeFirst() {
+	assert.True(this.T(), this.deque.OfferFirst(ONE))
+	assert.True(this.T(), this.deque.OfferFirst(TWO))
+	assert.Equal(this.T(), TWO, this.deque.TakeFirst())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestTakeLast() {
-	assert.True(suite.T(), suite.deque.OfferFirst(ONE))
-	assert.True(suite.T(), suite.deque.OfferFirst(TWO))
-	assert.Equal(suite.T(), ONE, suite.deque.TakeLast())
+func (this *LinkedBlockDequeTestSuite) TestTakeLast() {
+	assert.True(this.T(), this.deque.OfferFirst(ONE))
+	assert.True(this.T(), this.deque.OfferFirst(TWO))
+	assert.Equal(this.T(), ONE, this.deque.TakeLast())
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestRemoveLastOccurence()  {
-	assert.False(suite.T(),suite.deque.removeLastOccurrence(nil))
-	assert.False(suite.T(),suite.deque.removeLastOccurrence(ONE))
-	suite.deque.Add(ONE)
-	suite.deque.Add(ONE)
-	fmt.Println(suite.deque.Size())
-	assert.True(suite.T(), suite.deque.removeLastOccurrence(ONE))
-	fmt.Println(suite.deque.Size())
-	assert.True(suite.T(), suite.deque.Size() == 1)
+func (this *LinkedBlockDequeTestSuite) TestRemoveLastOccurence()  {
+	assert.False(this.T(),this.deque.removeLastOccurrence(nil))
+	assert.False(this.T(),this.deque.removeLastOccurrence(ONE))
+	this.deque.Add(ONE)
+	this.deque.Add(ONE)
+	fmt.Println(this.deque.Size())
+	assert.True(this.T(), this.deque.removeLastOccurrence(ONE))
+	fmt.Println(this.deque.Size())
+	assert.True(this.T(), this.deque.Size() == 1)
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestPollFirstWithTimeout() {
-	assert.Nil(suite.T(), suite.deque.PollFirst())
-	assert.Nil(suite.T(), suite.deque.PollFirstWithTimeout(50*time.Millisecond))
+func (this *LinkedBlockDequeTestSuite) TestPollFirstWithTimeout() {
+	assert.Nil(this.T(), this.deque.PollFirst())
+	assert.Nil(this.T(), this.deque.PollFirstWithTimeout(50*time.Millisecond))
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
-	assert.Nil(suite.T(), suite.deque.PollLast())
-	assert.Nil(suite.T(), suite.deque.PollLastWithTimeout(50*time.Millisecond))
+func (this *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
+	assert.Nil(this.T(), this.deque.PollLast())
+	assert.Nil(this.T(), this.deque.PollLastWithTimeout(50*time.Millisecond))
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestInterrupt() {
-	t := time.Tick(time.Duration(1000*time.Millisecond))
+func (this *LinkedBlockDequeTestSuite) TestInterrupt() {
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	go func() {
-		for _ = range t{
-			suite.deque.InterruptTakeWaiters()
-			fmt.Println("TestInterrupt suite.deque.InterruptTakeWaiters")
+		for i:=0;i<2;i++{
+			time.Sleep(time.Duration(1000)*time.Millisecond)
+			this.deque.InterruptTakeWaiters()
+			fmt.Println("TestInterrupt this.deque.InterruptTakeWaiters")
 			wait.Done()
 		}
 	}()
-	assert.Nil(suite.T(), suite.deque.TakeFirst())
-	assert.Nil(suite.T(), suite.deque.TakeFirst())
+	assert.Nil(this.T(), this.deque.TakeFirst())
+	assert.Nil(this.T(), this.deque.TakeFirst())
 	wait.Wait()
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestIterator() {
-	suite.deque.Add(ONE)
-	suite.deque.Add(TWO)
-	iterator := suite.deque.Iterator()
+func (this *LinkedBlockDequeTestSuite) TestIterator() {
+	this.deque.Add(ONE)
+	this.deque.Add(TWO)
+	iterator := this.deque.Iterator()
 	var list []int
 	for iterator.HasNext(){
 		item := iterator.Next().(int)
 		list = append(list,item)
 	}
 	//fmt.Println("list:",list)
-	assert.True(suite.T(), reflect.DeepEqual(list,[]int{ONE,TWO}))
+	assert.True(this.T(), reflect.DeepEqual(list,[]int{ONE,TWO}))
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestDescendingIterator() {
-	suite.deque.Add(ONE)
-	suite.deque.Add(TWO)
-	iterator := suite.deque.DescendingIterator()
+func (this *LinkedBlockDequeTestSuite) TestDescendingIterator() {
+	this.deque.Add(ONE)
+	this.deque.Add(TWO)
+	iterator := this.deque.DescendingIterator()
 	var list []int
 	for iterator.HasNext(){
 		item := iterator.Next().(int)
 		list = append(list,item)
 	}
 	//fmt.Println("list:",list)
-	assert.True(suite.T(), reflect.DeepEqual(list,[]int{TWO, ONE}))
+	assert.True(this.T(), reflect.DeepEqual(list,[]int{TWO, ONE}))
 }
 
-func (suite *LinkedBlockDequeTestSuite) TestIteratorRemove() {
+func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	count := 100;
-	suite.deque = NewDeque(count)
+	this.deque = NewDeque(count)
 
 	for i:=0;i < count;i++{
-		suite.deque.Add(i)
+		this.deque.Add(i)
 	}
-	assert.Equal(suite.T(),count, suite.deque.Size())
+	assert.Equal(this.T(),count, this.deque.Size())
 	startWait := sync.WaitGroup{}
 	startWait.Add(1)
 
@@ -198,7 +198,7 @@ func (suite *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	for i :=0;i < count;i++{
 		go func(idx int) {
 			startWait.Wait()
-			iterator := suite.deque.Iterator()
+			iterator := this.deque.Iterator()
 			for iterator.HasNext(){
 				item := iterator.Next()
 				if(item == nil){
@@ -213,7 +213,7 @@ func (suite *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	}
 	go func() {
 		startWait.Wait()
-		iterator := suite.deque.Iterator()
+		iterator := this.deque.Iterator()
 		c :=0
 		for iterator.HasNext(){
 			iterator.Next()
@@ -226,7 +226,7 @@ func (suite *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	}()
 	startWait.Done()
 	endWait.Wait()
-	iterator := suite.deque.Iterator()
+	iterator := this.deque.Iterator()
 	var list []int
 	for iterator.HasNext(){
 		item := iterator.Next().(int)
@@ -234,21 +234,51 @@ func (suite *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	}
 	//fmt.Println("list:",list)
 	//fmt.Println("counts:", counts)
-	assert.Equal(suite.T(),count/2, suite.deque.Size())
-	assert.Equal(suite.T(),count/2, len(list))
-	assert.Equal(suite.T(), int32(0), hasErr)
+	assert.Equal(this.T(),count/2, this.deque.Size())
+	assert.Equal(this.T(),count/2, len(list))
+	assert.Equal(this.T(), int32(0), hasErr)
 }
 
-func TestChannelBlock(t *testing.T)  {
+func (this *LinkedBlockDequeTestSuite) TestQueueLock() {
+	this.deque = NewDeque(1)
 	ch := make(chan int)
-	wait := new(sync.WaitGroup)
-	wait.Add(1)
 	go func() {
-		<- ch
-		//fmt.Println(v)
-		wait.Done()
+		ch <- this.deque.TakeFirst().(int)
+		fmt.Printf("TestQueueLock take finish.\n")
 	}()
-	time.Sleep(time.Duration(500*time.Millisecond))
-	close(ch)
-	wait.Wait()
+	//time.Sleep(time.Duration(1)*time.Second)
+	go func() {
+		this.deque.PutFirst(1)
+		fmt.Printf("TestQueueLock put finish.\n")
+	}()
+	val := <- ch
+	this.Equal(1, val)
+}
+
+
+func (this *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
+	this.deque = NewDeque(10)
+	ch := make(chan int)
+	count := 100
+	for i:=0;i<count;i++ {
+		go func() {
+			ch <- this.deque.TakeFirst().(int)
+		}()
+	}
+	for i:=0;i<count;i++ {
+		go func(val int) {
+			this.deque.PutLast(val)
+		}(i)
+	}
+	values := make([]int, count)
+	valueset := make(map[int]int,count)
+	for i:=0;i<count;i++ {
+		val := <- ch
+		values[i] = val
+		valueset[val] = val
+	}
+	fmt.Println("TestQueueConcurrent",values)
+	this.Equal(count, len(values))
+	this.Equal(count, len(valueset))
+	//this.Equal(1, val)
 }
