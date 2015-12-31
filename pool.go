@@ -9,9 +9,32 @@ import (
 	"time"
 	"fmt"
 )
+
 const(
 	debug = true
 )
+
+type baseErr struct {
+	msg string
+}
+
+func (this *baseErr) Error() string  {
+	return this.msg
+}
+
+type IllegalStatusErr struct {
+	baseErr
+}
+func NewIllegalStatusErr(msg string) *IllegalStatusErr{
+	return &IllegalStatusErr{baseErr{msg}}
+}
+type NoSuchElementErr struct {
+	baseErr
+}
+func NewNoSuchElementErr(msg string) *NoSuchElementErr{
+	return &NoSuchElementErr{baseErr{msg}}
+}
+
 type ObjectPool struct {
 	AbandonedConfig         *AbandonedConfig
 	Config                  *ObjectPoolConfig
@@ -38,16 +61,15 @@ func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
 	return NewObjectPool(factory, NewDefaultPoolConfig())
 }
 
-func (this *ObjectPool) AddObject() {
+func (this *ObjectPool) AddObject() error{
 	if this.IsClosed() {
-		//TODO panic?
-		return
+		return NewIllegalStatusErr("Pool not open")
 	}
 	if this.factory == nil {
-		panic(errors.New(
-			"Cannot add objects without a factory."))
+		return NewIllegalStatusErr("Cannot add objects without a factory.")
 	}
 	this.addIdleObject(this.create())
+	return nil
 }
 
 func (this *ObjectPool) addIdleObject(p *PooledObject) {
@@ -166,7 +188,7 @@ func (this *ObjectPool) updateStatsReturn(activeTime int64) {
 
 func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, error) {
 	if this.closed {
-		return nil, errors.New("Pool not open")
+		return nil, NewIllegalStatusErr("Pool not open")
 	}
 	ac := this.AbandonedConfig
 	if ac != nil && ac.RemoveAbandonedOnBorrow &&
@@ -209,7 +231,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				fmt.Printf("pool ok:%v,  p:%v \n", ok, p)
 			}
 			if !ok {
-				return nil, errors.New("Timeout waiting for idle object")
+				return nil, NewNoSuchElementErr("Timeout waiting for idle object")
 			}
 			if !p.Allocate() {
 				p = nil
@@ -226,7 +248,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				}
 			}
 			if p == nil {
-				return nil, errors.New("Timeout waiting for idle object")
+				return nil, NewNoSuchElementErr("Timeout waiting for idle object")
 			}
 			if !p.Allocate() {
 				p = nil
@@ -242,7 +264,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				this.destroy(p)
 				p = nil
 				if create {
-					return nil, errors.New("Timeout waiting for idle object")
+					return nil, NewNoSuchElementErr("Timeout waiting for idle object")
 				}
 			}
 		}
@@ -256,7 +278,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				//destroyedByBorrowValidationCount.incrementAndGet()
 				p = nil
 				if create {
-					return nil, errors.New("Unable to validate object")
+					return nil, NewNoSuchElementErr("Unable to validate object")
 				}
 			}
 		}
@@ -316,7 +338,7 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 
 	if !ok {
 		if !this.isAbandonedConfig() {
-			return errors.New(
+			return NewIllegalStatusErr(
 				"Returned object not currently part of this pool")
 		}
 		return nil // Object was abandoned and removed
@@ -326,7 +348,7 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 	state := p.state
 	if state != ALLOCATED {
 		p.lock.Unlock()
-		return errors.New(
+		return NewIllegalStatusErr(
 			"Object has already been returned to this pool or is invalid")
 	}
 	//use unlock method markReturning() not MarkReturning
@@ -356,7 +378,7 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 	}
 
 	if !p.Deallocate() {
-		return errors.New("Object has already been returned to this pool or is invalid")
+		return NewIllegalStatusErr("Object has already been returned to this pool or is invalid")
 	}
 
 	maxIdleSave := this.Config.MaxIdle
@@ -394,7 +416,7 @@ func (this *ObjectPool) InvalidateObject(object interface{}) error {
 		if this.isAbandonedConfig() {
 			return nil
 		} else {
-			return errors.New(
+			return NewIllegalStatusErr(
 				"Invalidated object not currently part of this pool")
 		}
 	}

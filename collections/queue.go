@@ -7,19 +7,6 @@ import (
 	"time"
 )
 
-//const (
-//
-//)
-//
-//type Error struct {
-//	msg string
-//
-//}
-//
-//func (this Error) Error() string {
-//	return this.msg
-//}
-
 const (
 	debug_queue = true
 )

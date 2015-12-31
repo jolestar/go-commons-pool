@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"reflect"
 )
 
 type TestObject struct {
@@ -374,8 +375,8 @@ func (this *PoolTestSuite) TestWhenExhaustedFail() {
 	obj1 := this.NoErrorWithResult(this.pool.BorrowObject())
 
 	err2 := this.ErrorWithResult(this.pool.BorrowObject())
-	//TODO check error type
-	this.assertNotNil(err2)
+	_,ok := err2.(*NoSuchElementErr)
+	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err2))
 
 	this.pool.ReturnObject(obj1)
 	this.assertEquals(1, this.pool.GetNumIdle())
@@ -389,8 +390,8 @@ func (this *PoolTestSuite) TestWhenExhaustedBlock() {
 	obj1 := this.NoErrorWithResult(this.pool.BorrowObject())
 
 	err2 := this.ErrorWithResult(this.pool.BorrowObject())
-	//TODO check error type
-	this.assertNotNil(err2)
+	_,ok := err2.(*NoSuchElementErr)
+	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err2))
 
 	this.pool.ReturnObject(obj1)
 }
@@ -700,8 +701,8 @@ func (this *PoolTestSuite) TestExceptionOnActivateDuringBorrow() {
 	// Validation will now fail on activation when borrowObject returns
 	// an idle instance, and then when attempting to create a new instance
 	_, err := this.pool.BorrowObject()
-	//TODO check error type
-	this.NotNil(err)
+	_,ok := err.(*NoSuchElementErr)
+	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err))
 
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
@@ -781,9 +782,9 @@ func (this *PoolTestSuite) TestTimeoutNoLeak() {
 	this.NoError(err)
 	obj2 := this.NoErrorWithResult(this.pool.BorrowObject())
 	err3 := this.ErrorWithResult(this.pool.BorrowObject())
-	//TODO check error type
-	this.Error(err3)
-	//fail("Expecting NoSuchElementException");
+	_,ok := err3.(*NoSuchElementErr)
+	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err3))
+
 	this.NoError(this.pool.ReturnObject(obj2))
 	this.NoError(this.pool.ReturnObject(obj))
 
