@@ -2,15 +2,14 @@ package pool
 
 import (
 	"errors"
+	"fmt"
 	"github.com/jolestar/go-commons-pool/collections"
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
-	"fmt"
 )
 
-const(
+const (
 	debug = true
 )
 
@@ -18,20 +17,23 @@ type baseErr struct {
 	msg string
 }
 
-func (this *baseErr) Error() string  {
+func (this *baseErr) Error() string {
 	return this.msg
 }
 
 type IllegalStatusErr struct {
 	baseErr
 }
-func NewIllegalStatusErr(msg string) *IllegalStatusErr{
+
+func NewIllegalStatusErr(msg string) *IllegalStatusErr {
 	return &IllegalStatusErr{baseErr{msg}}
 }
+
 type NoSuchElementErr struct {
 	baseErr
 }
-func NewNoSuchElementErr(msg string) *NoSuchElementErr{
+
+func NewNoSuchElementErr(msg string) *NoSuchElementErr {
 	return &NoSuchElementErr{baseErr{msg}}
 }
 
@@ -44,24 +46,29 @@ type ObjectPool struct {
 	idleObjects             *collections.LinkedBlockDeque
 	allObjects              *collections.SyncIdentityMap
 	factory                 PooledObjectFactory
-	createCount             int32
-	destroyedByEvictorCount int32
+	createCount             AtomicInteger
+	destroyedByEvictorCount AtomicInteger
+	destroyedCount          AtomicInteger
 	evictor                 *time.Ticker
 	evictionIterator        collections.Iterator
-	evictionPolicy          EvictionPolicy
 }
 
 func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
-	return &ObjectPool{factory:factory, Config:config,
-		idleObjects: collections.NewDeque(math.MaxInt32),
-		allObjects:collections.NewSyncMap()}
+	pool := ObjectPool{factory: factory, Config: config,
+		idleObjects:             collections.NewDeque(math.MaxInt32),
+		allObjects:              collections.NewSyncMap(),
+		createCount:             AtomicInteger(0),
+		destroyedByEvictorCount: AtomicInteger(0),
+		destroyedCount:          AtomicInteger(0)}
+	pool.StartEvictor()
+	return &pool
 }
 
 func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
 	return NewObjectPool(factory, NewDefaultPoolConfig())
 }
 
-func (this *ObjectPool) AddObject() error{
+func (this *ObjectPool) AddObject() error {
 	if this.IsClosed() {
 		return NewIllegalStatusErr("Pool not open")
 	}
@@ -101,7 +108,7 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 	timeout := now - int64((config.RemoveAbandonedTimeout * 1000))
 	var remove []PooledObject
 	objects := this.allObjects.Values()
-	for _,o := range objects {
+	for _, o := range objects {
 		pooledObject := o.(PooledObject)
 		pooledObject.lock.Lock()
 		if pooledObject.state == ALLOCATED &&
@@ -121,37 +128,21 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 	}
 }
 
-func (this *ObjectPool) incrementCreateCount() int32 {
-	return atomic.AddInt32(&this.createCount, int32(1))
-}
-
-func (this *ObjectPool) decrementCreateCount() int32 {
-	return atomic.AddInt32(&this.createCount, int32(-1))
-}
-
-func (this *ObjectPool) incrementDestroyedByEvictorCount() int32 {
-	return atomic.AddInt32(&this.destroyedByEvictorCount, int32(1))
-}
-
-func (this *ObjectPool) decrementDestroyedByEvictorCount() int32 {
-	return atomic.AddInt32(&this.destroyedByEvictorCount, int32(-1))
-}
-
 func (this *ObjectPool) create() *PooledObject {
-	if(debug){
+	if debug {
 		fmt.Printf("pool create\n")
 	}
 	localMaxTotal := this.Config.MaxTotal
-	newCreateCount := this.incrementCreateCount()
+	newCreateCount := this.createCount.IncrementAndGet()
 	if localMaxTotal > -1 && int(newCreateCount) > localMaxTotal ||
 		newCreateCount >= math.MaxInt32 {
-		this.decrementCreateCount()
+		this.createCount.DecrementAndGet()
 		return nil
 	}
 
 	p, e := this.factory.MakeObject()
 	if e != nil {
-		this.decrementCreateCount()
+		this.createCount.DecrementAndGet()
 		//return error ?
 		return nil
 	}
@@ -165,15 +156,15 @@ func (this *ObjectPool) create() *PooledObject {
 }
 
 func (this *ObjectPool) destroy(toDestroy *PooledObject) {
-	if(debug){
+	if debug {
 		fmt.Printf("pool destroy %v \n", toDestroy)
 	}
 	toDestroy.Invalidate()
 	this.idleObjects.Remove(toDestroy)
 	this.allObjects.Remove(toDestroy.Object)
 	this.factory.DestroyObject(toDestroy)
-	//destroyedCount.incrementAndGet();
-	this.decrementCreateCount()
+	this.destroyedCount.IncrementAndGet()
+	this.createCount.DecrementAndGet()
 }
 
 func (this *ObjectPool) updateStatsBorrow(object *PooledObject, timeMillis int64) {
@@ -209,7 +200,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	for p == nil {
 		create = false
 		if blockWhenExhausted {
-			p,ok = this.idleObjects.PollFirst().(*PooledObject)
+			p, ok = this.idleObjects.PollFirst().(*PooledObject)
 			if !ok {
 				p = this.create()
 				if p != nil {
@@ -217,17 +208,17 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 					ok = true
 				}
 			}
-			if(debug){
+			if debug {
 				fmt.Printf("pool create: %v, borrowMaxWaitMillis: %v, ok:%v,  p:%v \n", create, borrowMaxWaitMillis, ok, p)
 			}
 			if p == nil {
 				if borrowMaxWaitMillis < 0 {
-					p,ok = this.idleObjects.TakeFirst().(*PooledObject)
+					p, ok = this.idleObjects.TakeFirst().(*PooledObject)
 				} else {
-					p,ok = this.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond).(*PooledObject)
+					p, ok = this.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond).(*PooledObject)
 				}
 			}
-			if(debug){
+			if debug {
 				fmt.Printf("pool ok:%v,  p:%v \n", ok, p)
 			}
 			if !ok {
@@ -236,7 +227,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 			if !p.Allocate() {
 				p = nil
 			}
-			if(debug){
+			if debug {
 				fmt.Printf("pool p.Allocate p:%v \n", p)
 			}
 		} else {
@@ -258,7 +249,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if p != nil {
 			e := this.factory.ActivateObject(p)
 			if e != nil {
-				if(debug){
+				if debug {
 					fmt.Printf("pool ActiveObject fail:%v \n", e)
 				}
 				this.destroy(p)
@@ -268,7 +259,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				}
 			}
 		}
-		if(debug){
+		if debug {
 			fmt.Printf("pool ActiveObject end %v \n", p)
 		}
 		if p != nil && (this.Config.TestOnBorrow || create && this.Config.TestOnCreate) {
@@ -285,10 +276,10 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	}
 
 	this.updateStatsBorrow(p, currentTimeMillis()-waitTime)
-	if(debug){
+	if debug {
 		fmt.Printf("pool borrowObject p:%v ,p.Object:%v \n", p, p.Object)
 	}
-	return p.Object,nil
+	return p.Object, nil
 }
 
 func (this *ObjectPool) isAbandonedConfig() bool {
@@ -328,13 +319,13 @@ func (this *ObjectPool) IsClosed() bool {
 }
 
 func (this *ObjectPool) ReturnObject(object interface{}) error {
-	if(debug){
+	if debug {
 		fmt.Printf("pool ReturnObject %v \n", object)
 	}
-	if(object == nil){
+	if object == nil {
 		return errors.New("object is nil.")
 	}
-	p,ok := this.allObjects.Get(object).(*PooledObject)
+	p, ok := this.allObjects.Get(object).(*PooledObject)
 
 	if !ok {
 		if !this.isAbandonedConfig() {
@@ -406,12 +397,12 @@ func (this *ObjectPool) Clear() {
 
 	for ok {
 		this.destroy(p)
-		p,ok = this.idleObjects.Poll().(*PooledObject)
+		p, ok = this.idleObjects.Poll().(*PooledObject)
 	}
 }
 
 func (this *ObjectPool) InvalidateObject(object interface{}) error {
-	p,ok := this.allObjects.Get(object).(*PooledObject)
+	p, ok := this.allObjects.Get(object).(*PooledObject)
 	if !ok {
 		if this.isAbandonedConfig() {
 			return nil
@@ -444,11 +435,16 @@ func (this *ObjectPool) Close() {
 	// This clear removes any idle objects
 	this.Clear()
 
-	//jmxUnregister();
-
 	// Release any threads that were waiting for an object
 	this.idleObjects.InterruptTakeWaiters()
 	this.closeLock.Unlock()
+}
+
+/**
+if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call this method to let it to take effect.
+*/
+func (this *ObjectPool) StartEvictor() {
+	this.startEvictor(this.Config.TimeBetweenEvictionRunsMillis)
 }
 
 func (this *ObjectPool) startEvictor(delay int64) {
@@ -471,13 +467,11 @@ func (this *ObjectPool) startEvictor(delay int64) {
 }
 
 func (this *ObjectPool) getEvictionPolicy() EvictionPolicy {
-	if(this.evictionPolicy == nil){
-		this.evictionPolicy = GetEvictionPolicy(this.Config.EvictionPolicyName)
-		if(this.evictionPolicy == nil){
-			this.evictionPolicy = GetEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME)
-		}
+	evictionPolicy := GetEvictionPolicy(this.Config.EvictionPolicyName)
+	if evictionPolicy == nil {
+		evictionPolicy = GetEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME)
 	}
-	return this.evictionPolicy
+	return evictionPolicy
 }
 
 func (this *ObjectPool) getNumTests() int {
@@ -500,7 +494,7 @@ func (this *ObjectPool) EvictionIterator() collections.Iterator {
 	}
 }
 
-func (this *ObjectPool) getMinIdle() int{
+func (this *ObjectPool) getMinIdle() int {
 	maxIdleSave := this.Config.MaxIdle
 	if this.Config.MinIdle > maxIdleSave {
 		return maxIdleSave
@@ -509,7 +503,7 @@ func (this *ObjectPool) getMinIdle() int{
 }
 
 func (this *ObjectPool) evict() {
-	if debug{
+	if debug {
 		fmt.Printf("pool evict idle: %v \n", this.idleObjects.Size())
 	}
 	if this.idleObjects.Size() > 0 {
@@ -557,7 +551,7 @@ func (this *ObjectPool) evict() {
 
 			if evict {
 				this.destroy(underTest)
-				this.incrementDestroyedByEvictorCount()
+				this.destroyedByEvictorCount.IncrementAndGet()
 			} else {
 				var active bool = false
 				if testWhileIdle {
@@ -566,17 +560,17 @@ func (this *ObjectPool) evict() {
 						active = true
 					} else {
 						this.destroy(underTest)
-						this.incrementDestroyedByEvictorCount()
+						this.destroyedByEvictorCount.IncrementAndGet()
 					}
 					if active {
 						if !this.factory.ValidateObject(underTest) {
 							this.destroy(underTest)
-							this.incrementDestroyedByEvictorCount()
+							this.destroyedByEvictorCount.IncrementAndGet()
 						} else {
 							err := this.factory.PassivateObject(underTest)
 							if err != nil {
 								this.destroy(underTest)
-								this.incrementDestroyedByEvictorCount()
+								this.destroyedByEvictorCount.IncrementAndGet()
 							}
 						}
 					}
@@ -606,8 +600,8 @@ func (this *ObjectPool) preparePool() {
 	this.ensureMinIdle()
 }
 
-func Prefill(pool *ObjectPool, count int){
-	for i:=0;i<count;i++{
+func Prefill(pool *ObjectPool, count int) {
+	for i := 0; i < count; i++ {
 		pool.AddObject()
 	}
 }

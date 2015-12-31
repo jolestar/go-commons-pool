@@ -21,7 +21,7 @@ const (
 	DEFAULT_TEST_WHILE_IDLE                     = false
 	DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS   = int64(-1)
 	DEFAULT_BLOCK_WHEN_EXHAUSTED                = true
-	DEFAULT_EVICTION_POLICY_NAME                = "github.com/jolestar/pool/DefaultEvictionPolicy"
+	DEFAULT_EVICTION_POLICY_NAME                = "github.com/jolestar/go-commons-pool/DefaultEvictionPolicy"
 )
 
 type ObjectPoolConfig struct {

@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"math"
 	"math/rand"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
-	"reflect"
 )
 
 type TestObject struct {
@@ -375,8 +375,8 @@ func (this *PoolTestSuite) TestWhenExhaustedFail() {
 	obj1 := this.NoErrorWithResult(this.pool.BorrowObject())
 
 	err2 := this.ErrorWithResult(this.pool.BorrowObject())
-	_,ok := err2.(*NoSuchElementErr)
-	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err2))
+	_, ok := err2.(*NoSuchElementErr)
+	this.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err2))
 
 	this.pool.ReturnObject(obj1)
 	this.assertEquals(1, this.pool.GetNumIdle())
@@ -390,8 +390,8 @@ func (this *PoolTestSuite) TestWhenExhaustedBlock() {
 	obj1 := this.NoErrorWithResult(this.pool.BorrowObject())
 
 	err2 := this.ErrorWithResult(this.pool.BorrowObject())
-	_,ok := err2.(*NoSuchElementErr)
-	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err2))
+	_, ok := err2.(*NoSuchElementErr)
+	this.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err2))
 
 	this.pool.ReturnObject(obj1)
 }
@@ -701,8 +701,8 @@ func (this *PoolTestSuite) TestExceptionOnActivateDuringBorrow() {
 	// Validation will now fail on activation when borrowObject returns
 	// an idle instance, and then when attempting to create a new instance
 	_, err := this.pool.BorrowObject()
-	_,ok := err.(*NoSuchElementErr)
-	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err))
+	_, ok := err.(*NoSuchElementErr)
+	this.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err))
 
 	this.assertEquals(0, this.pool.GetNumActive())
 	this.assertEquals(0, this.pool.GetNumIdle())
@@ -782,8 +782,8 @@ func (this *PoolTestSuite) TestTimeoutNoLeak() {
 	this.NoError(err)
 	obj2 := this.NoErrorWithResult(this.pool.BorrowObject())
 	err3 := this.ErrorWithResult(this.pool.BorrowObject())
-	_,ok := err3.(*NoSuchElementErr)
-	this.True(ok,"expect NoSuchElementErr but get", reflect.TypeOf(err3))
+	_, ok := err3.(*NoSuchElementErr)
+	this.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err3))
 
 	this.NoError(this.pool.ReturnObject(obj2))
 	this.NoError(this.pool.ReturnObject(obj))
@@ -837,7 +837,7 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 		}
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 		if obj != nil {
-			this.pool.ReturnObject(obj)
+			this.NoError(this.pool.ReturnObject(obj))
 		}
 	}
 
@@ -846,8 +846,176 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 			time.Sleep(time.Duration(500) * time.Millisecond)
 		}
 		if threads[i].failed {
-			this.Fail("Thread %v failed: %v" , i,threads[i].error.Error())
+			this.Fail("Thread %v failed: %v", i, threads[i].error.Error())
 		}
 	}
 }
 
+func (this *PoolTestSuite) TestStartAndStopEvictor() {
+	// set up pool without evictor
+	this.pool.Config.MaxIdle = 6
+	this.pool.Config.MaxTotal = 6
+	this.pool.Config.NumTestsPerEvictionRun = 6
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(100)
+
+	for j := 0; j < 2; j++ {
+		// populate the pool
+		{
+			active := make([]*TestObject, 6)
+			for i := 0; i < 6; i++ {
+				active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+			}
+			for i := 0; i < 6; i++ {
+				this.NoError(this.pool.ReturnObject(active[i]))
+			}
+		}
+
+		// note that it stays populated
+		this.Equal(6, this.pool.GetNumIdle(), "Should have 6 idle")
+
+		// start the evictor
+		this.pool.Config.TimeBetweenEvictionRunsMillis = int64(50)
+
+		//re config evictor
+		this.pool.StartEvictor()
+
+		// wait a second (well, .2 seconds)
+		time.Sleep(time.Duration(200) * time.Millisecond)
+
+		// assert that the evictor has cleared out the pool
+		this.Equal(0, this.pool.GetNumIdle(), "Should have 0 idle")
+
+		// stop the evictor
+		this.pool.startEvictor(int64(0))
+	}
+}
+
+func (this *PoolTestSuite) TestEvictionWithNegativeNumTests() {
+	// when numTestsPerEvictionRun is negative, it represents a fraction of the idle objects to test
+	this.pool.Config.MaxIdle = 6
+	this.pool.Config.MaxTotal = 6
+	this.pool.Config.NumTestsPerEvictionRun = -2
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(50)
+
+	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
+	this.pool.StartEvictor()
+
+	active := make([]*TestObject, 6)
+	for i := 0; i < 6; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	for i := 0; i < 6; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() <= 6, "Should at most 6 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() <= 3, "Should at most 3 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() <= 2, "Should be at most 2 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	this.Equal(0, this.pool.GetNumIdle(), "Should be zero idle, found %v", this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestEviction() {
+	this.pool.Config.MaxIdle = 500
+	this.pool.Config.MaxTotal = 500
+	this.pool.Config.NumTestsPerEvictionRun = 100
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(250)
+	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(500)
+	this.pool.StartEvictor()
+
+	this.pool.Config.TestWhileIdle = true
+	active := make([]*TestObject, 500)
+
+	for i := 0; i < 500; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	for i := 0; i < 500; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+
+	time.Sleep(time.Duration(1000) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 500, "Should be less than 500 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 400, "Should be less than 400 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 300, "Should be less than 300 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 200, "Should be less than 200 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 100, "Should be less than 100 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.Equal(0, this.pool.GetNumIdle(), "Should be zero idle, found %v", this.pool.GetNumIdle())
+
+	for i := 0; i < 500; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	for i := 0; i < 500; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+
+	time.Sleep(time.Duration(1000) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 500, "Should be less than 500 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 400, "Should be less than 400 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 300, "Should be less than 300 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 200, "Should be less than 200 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.True(this.pool.GetNumIdle() < 100, "Should be less than 100 idle, found %v", this.pool.GetNumIdle())
+	time.Sleep(time.Duration(600) * time.Millisecond)
+	this.Equal(0, this.pool.GetNumIdle(), "Should be zero idle, found %v", this.pool.GetNumIdle())
+}
+
+type TestEvictionPolicy struct {
+	callCount AtomicInteger
+}
+
+func (this *TestEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
+	if this.callCount.IncrementAndGet() > 1500 {
+		return true
+	}
+	return false
+}
+
+var TestEvictionPolicyName = "github.com/jolestar/go-commons-pool/TestEvictionPolicy"
+
+func (this *PoolTestSuite) TestEvictionPolicy() {
+	this.pool.Config.MaxIdle = 500
+	this.pool.Config.MaxTotal = 500
+	this.pool.Config.NumTestsPerEvictionRun = 500
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(250)
+	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(500)
+	this.pool.StartEvictor()
+	this.pool.Config.TestWhileIdle = true
+	evictionPolicy := new(TestEvictionPolicy)
+
+	RegistryEvictionPolicy(TestEvictionPolicyName, evictionPolicy)
+
+	_,ok := this.pool.getEvictionPolicy().(*DefaultEvictionPolicy)
+	this.True(ok, "EvictionPolicy is not default policy")
+
+	this.pool.Config.EvictionPolicyName = TestEvictionPolicyName
+	this.Equal(evictionPolicy, this.pool.getEvictionPolicy())
+
+	active := make([]*TestObject, 500)
+	for i := 0; i < 500; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	for i := 0; i < 500; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+
+	// Eviction policy ignores first 1500 attempts to evict and then always
+	// evicts. After 1s, there should have been two runs of 500 tests so no
+	// evictions
+	time.Sleep(time.Duration(1000) * time.Millisecond)
+	this.Equal(500, this.pool.GetNumIdle(), "Should be 500 idle")
+	// A further 1s wasn't enough so allow 2s for the evictor to clear out
+	// all of the idle objects.
+	time.Sleep(time.Duration(2000) * time.Millisecond)
+	this.Equal(0, this.pool.GetNumIdle(), "Should be 0 idle")
+}
