@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	debug_pool = true
+	debug_pool = false
 )
 
 type baseErr struct {
@@ -541,7 +541,6 @@ func (this *ObjectPool) evict() {
 			}
 
 			underTest = this.evictionIterator.Next().(*PooledObject)
-			//} catch (NoSuchElementException nsee) {
 			if underTest == nil {
 				// Object was borrowed in another thread
 				// Don't count this as an eviction test so reduce i;
