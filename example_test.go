@@ -1,8 +1,8 @@
 package pool
+
 import "testing"
 
 type MyPoolObject struct {
-
 }
 
 func TestExample(t *testing.T) {
@@ -15,7 +15,6 @@ func TestExample(t *testing.T) {
 }
 
 type MyObjectFactory struct {
-	
 }
 
 func (this *MyObjectFactory) MakeObject() (*PooledObject, error) {
