@@ -1058,7 +1058,7 @@ func (this *PoolTestSuite) TestEvictionSoftMinIdle() {
 	this.Equal(2, this.pool.GetNumIdle(), "Idle count different than expected.")
 
 	// Hard evict the rest.
-	time.Sleep(time.Duration(1500) * time.Millisecond)
+	time.Sleep(time.Duration(1600) * time.Millisecond)
 	this.pool.evict()
 	this.Equal(0, this.pool.GetNumIdle(), "Idle count different than expected.")
 }
