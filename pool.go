@@ -69,12 +69,9 @@ func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
 	return NewObjectPool(factory, NewDefaultPoolConfig())
 }
 
-/**
- * Create an object using the PooledObjectFactory factory, passivate it, and then place it in
- * the idle object pool. <code>AddObject</code> is useful for "pre-loading"
- * a pool with idle objects. (Optional operation).
- *
- */
+// Create an object using the PooledObjectFactory factory, passivate it, and then place it in
+// the idle object pool. AddObject is useful for "pre-loading"
+// a pool with idle objects. (Optional operation).
 func (this *ObjectPool) AddObject() error {
 	if this.IsClosed() {
 		return NewIllegalStatusErr("Pool not open")
@@ -97,34 +94,29 @@ func (this *ObjectPool) addIdleObject(p *PooledObject) {
 	}
 }
 
-/**
-* Obtains an instance from this pool.
-*
-* Instances returned from this method will have been either newly created
-* with PooledObjectFactory.MakeObject or will be a previously
-* idle object and have been activated with
-*  PooledObjectFactory.ActivateObject and then validated with
-*  PooledObjectFactory.ValidateObject.
-*
-* By contract, clients <strong>must</strong> return the borrowed instance
-* using <code>ReturnObject</code>, <code>InvalidateObject</code>
- */
+//Obtains an instance from this pool.
+//
+// Instances returned from this method will have been either newly created
+// with PooledObjectFactory.MakeObject or will be a previously
+// idle object and have been activated with
+// PooledObjectFactory.ActivateObject and then validated with
+// PooledObjectFactory.ValidateObject.
+//
+// By contract, clients must return the borrowed instance
+// using ReturnObject, InvalidateObject
 func (this *ObjectPool) BorrowObject() (interface{}, error) {
 	return this.borrowObject(this.Config.MaxWaitMillis)
 }
 
-/**
-* Return the number of instances currently idle in this pool. This may be
-* considered an approximation of the number of objects that can be
-* BorrowObject borrowed without creating any new instances.
- */
+//Return the number of instances currently idle in this pool. This may be
+//considered an approximation of the number of objects that can be
+//BorrowObject borrowed without creating any new instances.
 func (this *ObjectPool) GetNumIdle() int {
 	return this.idleObjects.Size()
 }
 
-/**
- * Return the number of instances currently borrowed from this pool.
- */
+
+//Return the number of instances currently borrowed from this pool.
 func (this *ObjectPool) GetNumActive() int {
 	return this.allObjects.Size() - this.idleObjects.Size()
 }
@@ -358,10 +350,8 @@ func (this *ObjectPool) IsClosed() bool {
 	return this.closed
 }
 
-/**
-* Return an instance to the pool. By contract, <code>object</code>
-* <strong>must</strong> have been obtained using <code>BorrowObject()</code>
- */
+// Return an instance to the pool. By contract, object
+// must have been obtained using BorrowObject()
 func (this *ObjectPool) ReturnObject(object interface{}) error {
 	if debug_pool {
 		fmt.Printf("pool ReturnObject %v \n", object)
@@ -436,11 +426,9 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 	return nil
 }
 
-/**
- * Clears any objects sitting idle in the pool, releasing any associated
- * resources (optional operation). Idle objects cleared must be
- *  PooledObjectFactory.DestroyObject(PooledObject) .
- */
+//Clears any objects sitting idle in the pool, releasing any associated
+//resources (optional operation). Idle objects cleared must be
+//PooledObjectFactory.DestroyObject(PooledObject) .
 func (this *ObjectPool) Clear() {
 	p, ok := this.idleObjects.Poll().(*PooledObject)
 
@@ -450,15 +438,13 @@ func (this *ObjectPool) Clear() {
 	}
 }
 
-/**
-* Invalidates an object from the pool.
-*
-* By contract, <code>object</code> <strong>must</strong> have been obtained
-* using BorrowObject.
-* <p>
-* This method should be used when an object that has been borrowed is
-* determined (due to an exception or other problem) to be invalid.
- */
+// Invalidates an object from the pool.
+//
+// By contract, object must have been obtained
+// using BorrowObject.
+// 
+// This method should be used when an object that has been borrowed is
+// determined (due to an exception or other problem) to be invalid.
 func (this *ObjectPool) InvalidateObject(object interface{}) error {
 	p, ok := this.allObjects.Get(object).(*PooledObject)
 	if !ok {
@@ -478,9 +464,7 @@ func (this *ObjectPool) InvalidateObject(object interface{}) error {
 	return nil
 }
 
-/**
- * Close this pool, and free any resources associated with it.
- */
+//Close this pool, and free any resources associated with it.
 func (this *ObjectPool) Close() {
 	if this.IsClosed() {
 		return
@@ -503,9 +487,7 @@ func (this *ObjectPool) Close() {
 	this.closeLock.Unlock()
 }
 
-/**
-if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call this method to let it to take effect.
-*/
+//if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call this method to let it to take effect.
 func (this *ObjectPool) StartEvictor() {
 	this.startEvictor(this.Config.TimeBetweenEvictionRunsMillis)
 }

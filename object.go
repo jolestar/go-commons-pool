@@ -39,8 +39,6 @@ type PooledObject struct {
 	state         PooledObjectState
 	BorrowedCount int32
 	lock          sync.Mutex
-	//	//void setLogAbandoned(boolean var1);
-	//	//void printStackTrace(PrintWriter var1);
 }
 
 func NewPooledObject(object interface{}) *PooledObject {
@@ -107,7 +105,6 @@ func (this *PooledObject) doAllocate() bool {
 	return false
 }
 
-//synchronized
 func (this *PooledObject) Allocate() bool {
 	this.lock.Lock()
 	result := this.doAllocate()
