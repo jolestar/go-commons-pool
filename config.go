@@ -170,6 +170,7 @@ type ObjectPoolConfig struct {
 	* The number of milliseconds to sleep between runs of the idle
 	* object evictor thread. When non-positive, no idle object evictor thread
 	* will be run.
+	* if this value changed after ObjectPool created, should call ObjectPool.StartEvictor to take effect.
 	 */
 	TimeBetweenEvictionRunsMillis int64
 }
