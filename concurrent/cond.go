@@ -1,4 +1,4 @@
-package collections
+package concurrent
 
 import (
 	"sync"
@@ -36,9 +36,11 @@ func (this *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, 
 return is interrupt
 */
 func (this *TimeoutCond) Wait() bool {
+	//copy signal in lock, avoid data race with Interrupt
+	ch := this.signal
 	this.L.Unlock()
 	defer this.L.Lock()
-	_, ok := <-this.signal
+	_, ok := <-ch
 	return !ok
 }
 
@@ -50,6 +52,8 @@ func (this *TimeoutCond) Signal() {
 }
 
 func (this *TimeoutCond) Interrupt() {
+	this.L.Lock()
+	defer this.L.Unlock()
 	close(this.signal)
 	this.signal = make(chan int, 0)
 }

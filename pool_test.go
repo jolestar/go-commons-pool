@@ -3,6 +3,7 @@ package pool
 import (
 	"errors"
 	"fmt"
+	"github.com/jolestar/go-commons-pool/concurrent"
 	"github.com/stretchr/testify/suite"
 	"math"
 	"math/rand"
@@ -473,7 +474,7 @@ func (this *PoolTestSuite) TestEvictWhileEmpty() {
 	this.pool.evict()
 }
 
-type TestRunnable struct {
+type TestThreadArg struct {
 	/** pool to borrow from */
 	pool *ObjectPool
 
@@ -491,60 +492,64 @@ type TestRunnable struct {
 
 	/** object expected to be borrowed (fail otherwise) */
 	expectedObject interface{}
+}
 
+type TestThreadResult struct {
 	complete bool
 	failed   bool
 	error    error
 }
 
-func NewTestRunnableSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestRunnable {
-	return NewTestRunnable(pool, iter, delay, delay, randomDelay, nil)
+func NewTesThreadArgSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestThreadArg {
+	return NewTestThreadArg(pool, iter, delay, delay, randomDelay, nil)
 }
 
-func NewTestRunnable(pool *ObjectPool, iter int, startDelay int,
-	holdTime int, randomDelay bool, obj interface{}) *TestRunnable {
-	return &TestRunnable{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
+func NewTestThreadArg(pool *ObjectPool, iter int, startDelay int,
+	holdTime int, randomDelay bool, obj interface{}) *TestThreadArg {
+	return &TestThreadArg{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
 }
 
-func (this *TestRunnable) Run() {
-	for i := 0; i < this.iter; i++ {
+func threadRun(arg *TestThreadArg, resultChan chan TestThreadResult) {
+	result := TestThreadResult{}
+	for i := 0; i < arg.iter; i++ {
 		var startDelay int
-		if this.randomDelay {
-			startDelay = int(rand.Int31n(int32(this.startDelay)))
+		if arg.randomDelay {
+			startDelay = int(rand.Int31n(int32(arg.startDelay)))
 		} else {
-			startDelay = this.startDelay
+			startDelay = arg.startDelay
 		}
 		var holdTime int
-		if this.randomDelay {
-			holdTime = int(rand.Int31n(int32(this.holdTime)))
+		if arg.randomDelay {
+			holdTime = int(rand.Int31n(int32(arg.holdTime)))
 		} else {
-			holdTime = this.holdTime
+			holdTime = arg.holdTime
 		}
 		time.Sleep(time.Duration(startDelay) * time.Millisecond)
-		obj, err := this.pool.BorrowObject()
+		obj, err := arg.pool.BorrowObject()
 		if err != nil {
-			this.error = err
-			this.failed = true
-			this.complete = true
+			result.error = err
+			result.failed = true
+			result.complete = true
 			break
 		}
 
-		if this.expectedObject != nil && !(this.expectedObject == obj) {
-			this.error = fmt.Errorf("Expected: %v found: %v", this.expectedObject, obj)
-			this.failed = true
-			this.complete = true
+		if arg.expectedObject != nil && !(arg.expectedObject == obj) {
+			result.error = fmt.Errorf("Expected: %v found: %v", arg.expectedObject, obj)
+			result.failed = true
+			result.complete = true
 			break
 		}
 		time.Sleep(time.Duration(holdTime) * time.Millisecond)
-		err = this.pool.ReturnObject(obj)
+		err = arg.pool.ReturnObject(obj)
 		if err != nil {
-			this.error = err
-			this.failed = true
-			this.complete = true
+			result.error = err
+			result.failed = true
+			result.complete = true
 			break
 		}
 	}
-	this.complete = true
+	result.complete = true
+	resultChan <- result
 }
 
 func (this *PoolTestSuite) TestEvictAddObjects() {
@@ -556,14 +561,16 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	this.pool.BorrowObject() // numActive = 1, numIdle = 0
 	// Create a test thread that will run once and try a borrow after
 	// 150ms fixed delay
-	borrower := NewTestRunnableSimple(this.pool, 1, 150, false)
-	borrowerThread := NewThreadWithRunnable(borrower)
+	borrower := NewTesThreadArgSimple(this.pool, 1, 150, false)
 	//// Set evictor to run in 100 ms - will create idle instance
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
-	borrowerThread.Start() // Off to the races
-	borrowerThread.Join()
-	fmt.Printf("TestEvictAddObjects %v error:%v", borrower, borrower.error)
-	this.True(!borrower.failed)
+	ch := make(chan TestThreadResult)
+	go threadRun(borrower, ch)
+	//borrowerThread.Start() // Off to the races
+	//borrowerThread.Join()
+	result := <-ch
+	fmt.Printf("TestEvictAddObjects %v error:%v", borrower, result.error)
+	this.True(!result.failed)
 }
 
 func (this *PoolTestSuite) TestEvictLIFO() {
@@ -827,14 +834,15 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(-1)
 
 	// Start threads to borrow objects
-	threads := make([]*TestRunnable, numThreads)
+	threadArgs := make([]*TestThreadArg, numThreads)
+	resultChans := make([]chan TestThreadResult, numThreads)
 	for i := 0; i < numThreads; i++ {
 		// Factor of 2 on iterations so main thread does work whilst other
 		// threads are running. Factor of 2 on delay so average delay for
 		// other threads == actual delay for main thread
-		threads[i] = NewTestRunnableSimple(this.pool, numIter*2, delay*2, true)
-		t := NewThreadWithRunnable(threads[i])
-		t.Start()
+		threadArgs[i] = NewTesThreadArgSimple(this.pool, numIter*2, delay*2, true)
+		resultChans[i] = make(chan TestThreadResult)
+		go threadRun(threadArgs[i], resultChans[i])
 	}
 	// Give the threads a chance to start doing some work
 	time.Sleep(time.Duration(5000) * time.Millisecond)
@@ -856,11 +864,9 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 	}
 
 	for i := 0; i < numThreads; i++ {
-		for !(threads[i]).complete {
-			time.Sleep(time.Duration(500) * time.Millisecond)
-		}
-		if threads[i].failed {
-			this.Fail("Thread %v failed: %v", i, threads[i].error.Error())
+		result := <-resultChans[i]
+		if result.failed {
+			this.Fail("Thread %v failed: %v", i, result.error.Error())
 		}
 	}
 }
@@ -985,7 +991,7 @@ func (this *PoolTestSuite) TestEviction() {
 }
 
 type TestEvictionPolicy struct {
-	callCount AtomicInteger
+	callCount concurrent.AtomicInteger
 }
 
 func (this *TestEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
@@ -1068,7 +1074,7 @@ func (this *PoolTestSuite) TestEvictionInvalid() {
 		func() (interface{}, error) {
 			return &TestObject{}, nil
 		}, nil, func(object *PooledObject) bool {
-			fmt.Printf("TestEvictionInvalid valid object %v \n", object)
+			//fmt.Printf("TestEvictionInvalid valid object %v \n", object)
 			time.Sleep(time.Duration(1000) * time.Millisecond)
 			return false
 		}, nil, nil))

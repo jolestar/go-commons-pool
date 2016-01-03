@@ -1,4 +1,4 @@
-package collections
+package concurrent
 
 import (
 	"fmt"

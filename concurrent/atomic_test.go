@@ -1,4 +1,4 @@
-package pool
+package concurrent
 
 import (
 	"github.com/stretchr/testify/assert"

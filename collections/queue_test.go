@@ -2,11 +2,11 @@ package collections
 
 import (
 	"fmt"
+	"github.com/jolestar/go-commons-pool/concurrent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -191,8 +191,8 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	endWait := sync.WaitGroup{}
 	endWait.Add(count + 1)
 
-	counts := make(map[int]int32, count)
-	var hasErr int32 = 0
+	counts := make(map[int]concurrent.AtomicInteger, count)
+	var hasErr concurrent.AtomicInteger = concurrent.AtomicInteger(0)
 	for i := 0; i < count; i++ {
 		go func(idx int) {
 			startWait.Wait()
@@ -200,10 +200,10 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 			for iterator.HasNext() {
 				item := iterator.Next()
 				if item == nil {
-					hasErr = atomic.AddInt32(&hasErr, int32(1))
+					hasErr.IncrementAndGet()
 				} else {
 					c := counts[idx]
-					counts[idx] = atomic.AddInt32(&c, int32(1))
+					c.IncrementAndGet()
 				}
 			}
 			endWait.Done()
@@ -234,7 +234,7 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	//fmt.Println("counts:", counts)
 	assert.Equal(this.T(), count/2, this.deque.Size())
 	assert.Equal(this.T(), count/2, len(list))
-	assert.Equal(this.T(), int32(0), hasErr)
+	assert.Equal(this.T(), int32(0), hasErr.Get())
 }
 
 func (this *LinkedBlockDequeTestSuite) TestQueueLock() {

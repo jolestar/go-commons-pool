@@ -3,6 +3,7 @@ package collections
 import (
 	"errors"
 	"fmt"
+	"github.com/jolestar/go-commons-pool/concurrent"
 	"sync"
 	"time"
 )
@@ -64,10 +65,10 @@ type LinkedBlockDeque struct {
 	lock *sync.Mutex
 
 	/** Condition for waiting takes */
-	notEmpty *TimeoutCond
+	notEmpty *concurrent.TimeoutCond
 
 	/** Condition for waiting puts */
-	notFull *TimeoutCond
+	notFull *concurrent.TimeoutCond
 }
 
 func NewDeque(capacity int) *LinkedBlockDeque {
@@ -75,7 +76,7 @@ func NewDeque(capacity int) *LinkedBlockDeque {
 		panic(errors.New("capacity must > 0"))
 	}
 	lock := new(sync.Mutex)
-	return &LinkedBlockDeque{capacity: capacity, lock: lock, notEmpty: NewTimeoutCond(lock), notFull: NewTimeoutCond(lock)}
+	return &LinkedBlockDeque{capacity: capacity, lock: lock, notEmpty: concurrent.NewTimeoutCond(lock), notFull: concurrent.NewTimeoutCond(lock)}
 }
 
 /**

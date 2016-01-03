@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jolestar/go-commons-pool/collections"
+	"github.com/jolestar/go-commons-pool/concurrent"
 	"math"
 	"sync"
 	"time"
@@ -46,9 +47,9 @@ type ObjectPool struct {
 	idleObjects             *collections.LinkedBlockDeque
 	allObjects              *collections.SyncIdentityMap
 	factory                 PooledObjectFactory
-	createCount             AtomicInteger
-	destroyedByEvictorCount AtomicInteger
-	destroyedCount          AtomicInteger
+	createCount             concurrent.AtomicInteger
+	destroyedByEvictorCount concurrent.AtomicInteger
+	destroyedCount          concurrent.AtomicInteger
 	evictor                 *time.Ticker
 	evictionIterator        collections.Iterator
 }
@@ -57,9 +58,9 @@ func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *Objec
 	pool := ObjectPool{factory: factory, Config: config,
 		idleObjects:             collections.NewDeque(math.MaxInt32),
 		allObjects:              collections.NewSyncMap(),
-		createCount:             AtomicInteger(0),
-		destroyedByEvictorCount: AtomicInteger(0),
-		destroyedCount:          AtomicInteger(0)}
+		createCount:             concurrent.AtomicInteger(0),
+		destroyedByEvictorCount: concurrent.AtomicInteger(0),
+		destroyedCount:          concurrent.AtomicInteger(0)}
 	pool.StartEvictor()
 	return &pool
 }
