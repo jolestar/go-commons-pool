@@ -115,7 +115,6 @@ func (this *ObjectPool) GetNumIdle() int {
 	return this.idleObjects.Size()
 }
 
-
 //Return the number of instances currently borrowed from this pool.
 func (this *ObjectPool) GetNumActive() int {
 	return this.allObjects.Size() - this.idleObjects.Size()
@@ -442,7 +441,7 @@ func (this *ObjectPool) Clear() {
 //
 // By contract, object must have been obtained
 // using BorrowObject.
-// 
+//
 // This method should be used when an object that has been borrowed is
 // determined (due to an exception or other problem) to be invalid.
 func (this *ObjectPool) InvalidateObject(object interface{}) error {
