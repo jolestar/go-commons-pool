@@ -583,7 +583,7 @@ func (this *ObjectPool) evict() {
 				continue
 			}
 
-			if !underTest.startEvictionTest() {
+			if !underTest.StartEvictionTest() {
 				// Object was borrowed in another thread
 				// Don't count this as an eviction test so reduce i;
 				i--
@@ -625,7 +625,7 @@ func (this *ObjectPool) evict() {
 						}
 					}
 				}
-				if !underTest.endEvictionTest(this.idleObjects) {
+				if !underTest.EndEvictionTest(this.idleObjects) {
 					// TODO - May need to add code here once additional
 					// states are used
 				}

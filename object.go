@@ -172,7 +172,9 @@ func (this *PooledObject) markReturning() {
 	this.state = RETURNING
 }
 
-func (this *PooledObject) startEvictionTest() bool {
+func (this *PooledObject) StartEvictionTest() bool {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	if this.state == IDLE {
 		this.state = EVICTION
 		return true
@@ -181,7 +183,9 @@ func (this *PooledObject) startEvictionTest() bool {
 	return false
 }
 
-func (this *PooledObject) endEvictionTest(idleQueue *collections.LinkedBlockDeque) bool {
+func (this *PooledObject) EndEvictionTest(idleQueue *collections.LinkedBlockDeque) bool {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	if this.state == EVICTION {
 		this.state = IDLE
 		return true
