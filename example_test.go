@@ -46,3 +46,21 @@ func TestCustomFactoryExample(t *testing.T) {
 	obj, _ := pool.BorrowObject()
 	pool.ReturnObject(obj)
 }
+
+//func TestStringExampleFail(t *testing.T) {
+//	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+//		func() (interface{}, error) {
+//			return "hello", nil
+//		}))
+//	obj, _ := pool.BorrowObject()
+//	pool.ReturnObject(obj)
+//}
+
+//func TestIntExampleFail(t *testing.T) {
+//	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+//		func() (interface{}, error) {
+//			return 1, nil
+//		}))
+//	obj, _ := pool.BorrowObject()
+//	pool.ReturnObject(obj)
+//}
