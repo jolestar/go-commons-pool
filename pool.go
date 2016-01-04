@@ -557,6 +557,8 @@ func (this *ObjectPool) evict() {
 		var underTest *PooledObject
 		evictionPolicy := this.getEvictionPolicy()
 		this.evictionLock.Lock()
+		defer this.evictionLock.Unlock()
+
 		evictionConfig := EvictionConfig{
 			IdleEvictTime:     this.Config.MinEvictableIdleTimeMillis,
 			IdleSoftEvictTime: this.Config.SoftMinEvictableIdleTimeMillis,
@@ -629,7 +631,7 @@ func (this *ObjectPool) evict() {
 				}
 			}
 		}
-		this.evictionLock.Unlock()
+
 	}
 	ac := this.AbandonedConfig
 	if ac != nil && ac.RemoveAbandonedOnMaintenance {

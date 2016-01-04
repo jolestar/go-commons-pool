@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"math"
 	"math/rand"
@@ -509,47 +510,51 @@ func NewTestThreadArg(pool *ObjectPool, iter int, startDelay int,
 	return &TestThreadArg{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
 }
 
-func threadRun(arg *TestThreadArg, resultChan chan TestThreadResult) {
+func threadRun(arg *TestThreadArg) chan TestThreadResult {
+	resultChan := make(chan TestThreadResult)
 	result := TestThreadResult{}
-	for i := 0; i < arg.iter; i++ {
-		var startDelay int
-		if arg.randomDelay {
-			startDelay = int(rand.Int31n(int32(arg.startDelay)))
-		} else {
-			startDelay = arg.startDelay
-		}
-		var holdTime int
-		if arg.randomDelay {
-			holdTime = int(rand.Int31n(int32(arg.holdTime)))
-		} else {
-			holdTime = arg.holdTime
-		}
-		time.Sleep(time.Duration(startDelay) * time.Millisecond)
-		obj, err := arg.pool.BorrowObject()
-		if err != nil {
-			result.error = err
-			result.failed = true
-			result.complete = true
-			break
-		}
+	go func() {
+		for i := 0; i < arg.iter; i++ {
+			var startDelay int
+			if arg.randomDelay {
+				startDelay = int(rand.Int31n(int32(arg.startDelay)))
+			} else {
+				startDelay = arg.startDelay
+			}
+			var holdTime int
+			if arg.randomDelay {
+				holdTime = int(rand.Int31n(int32(arg.holdTime)))
+			} else {
+				holdTime = arg.holdTime
+			}
+			time.Sleep(time.Duration(startDelay) * time.Millisecond)
+			obj, err := arg.pool.BorrowObject()
+			if err != nil {
+				result.error = err
+				result.failed = true
+				result.complete = true
+				break
+			}
 
-		if arg.expectedObject != nil && !(arg.expectedObject == obj) {
-			result.error = fmt.Errorf("Expected: %v found: %v", arg.expectedObject, obj)
-			result.failed = true
-			result.complete = true
-			break
+			if arg.expectedObject != nil && !(arg.expectedObject == obj) {
+				result.error = fmt.Errorf("Expected: %v found: %v", arg.expectedObject, obj)
+				result.failed = true
+				result.complete = true
+				break
+			}
+			time.Sleep(time.Duration(holdTime) * time.Millisecond)
+			err = arg.pool.ReturnObject(obj)
+			if err != nil {
+				result.error = err
+				result.failed = true
+				result.complete = true
+				break
+			}
 		}
-		time.Sleep(time.Duration(holdTime) * time.Millisecond)
-		err = arg.pool.ReturnObject(obj)
-		if err != nil {
-			result.error = err
-			result.failed = true
-			result.complete = true
-			break
-		}
-	}
-	result.complete = true
-	resultChan <- result
+		result.complete = true
+		resultChan <- result
+	}()
+	return resultChan
 }
 
 func (this *PoolTestSuite) TestEvictAddObjects() {
@@ -564,10 +569,7 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	borrower := NewTesThreadArgSimple(this.pool, 1, 150, false)
 	//// Set evictor to run in 100 ms - will create idle instance
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
-	ch := make(chan TestThreadResult)
-	go threadRun(borrower, ch)
-	//borrowerThread.Start() // Off to the races
-	//borrowerThread.Join()
+	ch := threadRun(borrower)
 	result := <-ch
 	fmt.Printf("TestEvictAddObjects %v error:%v", borrower, result.error)
 	this.True(!result.failed)
@@ -841,8 +843,7 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 		// threads are running. Factor of 2 on delay so average delay for
 		// other threads == actual delay for main thread
 		threadArgs[i] = NewTesThreadArgSimple(this.pool, numIter*2, delay*2, true)
-		resultChans[i] = make(chan TestThreadResult)
-		go threadRun(threadArgs[i], resultChans[i])
+		resultChans[i] = threadRun(threadArgs[i])
 	}
 	// Give the threads a chance to start doing some work
 	time.Sleep(time.Duration(5000) * time.Millisecond)
@@ -1191,4 +1192,116 @@ func (this *PoolTestSuite) TestMinIdle() {
 	}
 	sleep(150)
 	this.Equal(10, this.pool.GetNumIdle(), "Should be 10 idle, found %v", this.pool.GetNumIdle())
+}
+
+func (this *PoolTestSuite) TestMinIdleMaxTotal() {
+	this.pool.Config.MaxIdle = 500
+	this.pool.Config.MinIdle = 5
+	this.pool.Config.MaxTotal = 10
+	this.pool.Config.NumTestsPerEvictionRun = 0
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(50)
+	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
+	this.pool.Config.TestWhileIdle = true
+	this.pool.StartEvictor()
+
+	sleep(150)
+	this.Equal(5, this.pool.GetNumIdle(), "Should be 5 idle, found %v", this.pool.GetNumIdle())
+
+	active := make([]*TestObject, 10)
+	sleep(150)
+	this.Equal(5, this.pool.GetNumIdle(), "Should be 5 idle, found %v", this.pool.GetNumIdle())
+
+	for i := 0; i < 5; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	sleep(150)
+	this.Equal(5, this.pool.GetNumIdle(), "Should be 5 idle, found %v", this.pool.GetNumIdle())
+
+	for i := 0; i < 5; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+	sleep(150)
+	this.Equal(10, this.pool.GetNumIdle(), "Should be 10 idle, found %v", this.pool.GetNumIdle())
+
+	for i := 0; i < 10; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+	sleep(150)
+	this.Equal(0, this.pool.GetNumIdle(), "Should be 0 idle, found %v", this.pool.GetNumIdle())
+
+	for i := 0; i < 10; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+	sleep(150)
+	this.Equal(10, this.pool.GetNumIdle(), "Should be 10 idle, found %v", this.pool.GetNumIdle())
+}
+
+func runTestThreads(t *testing.T, numThreads int, iterations int, delay int, testPool *ObjectPool) {
+
+	arg := NewTestThreadArg(testPool, iterations, delay, delay, true, nil)
+	resultChans := make([]chan TestThreadResult, numThreads)
+	for i := 0; i < numThreads; i++ {
+		resultChans[i] = threadRun(arg)
+	}
+
+	for i := 0; i < numThreads; i++ {
+		result := <-resultChans[i]
+		if result.failed {
+			assert.Fail(t, "Thread %v failed: %v", i, result.error.Error())
+		}
+	}
+}
+
+func (this *PoolTestSuite) TestThreaded1() {
+	this.pool.Config.MaxTotal = 15
+	this.pool.Config.MaxIdle = 15
+	this.pool.Config.MaxWaitMillis = int64(1000)
+	runTestThreads(this.T(), 20, 100, 50, this.pool)
+}
+
+func (this *PoolTestSuite) TestMaxTotalInvariant() {
+	maxTotal := 15
+	this.factory.evenValid = false    // Every other validation fails
+	this.factory.destroyLatency = 100 // Destroy takes 100 ms
+	this.factory.maxTotal = maxTotal  // (makes - destroys) bound
+	this.factory.enableValidation = true
+	this.pool.Config.MaxTotal = maxTotal
+	this.pool.Config.MaxIdle = -1
+	this.pool.Config.TestOnReturn = true
+	this.pool.Config.MaxWaitMillis = int64(1000)
+	runTestThreads(this.T(), 5, 10, 50, this.pool)
+}
+
+func concurrentBorrowAndEvictThread(borrow bool, pool *ObjectPool) chan interface{} {
+	ch := make(chan interface{}, 1)
+	go func(borrow bool, pool *ObjectPool) {
+		if borrow {
+			obj, _ := pool.BorrowObject()
+			ch <- obj
+		} else {
+			pool.evict()
+			ch <- 1
+		}
+	}(borrow, pool)
+	return ch
+}
+
+func (this *PoolTestSuite) TestConcurrentBorrowAndEvict() {
+	this.pool.Config.MaxTotal = 1
+	this.NoError(this.pool.AddObject())
+
+	for i := 0; i < 5000; i++ {
+		one := concurrentBorrowAndEvictThread(true, this.pool)
+		two := concurrentBorrowAndEvictThread(false, this.pool)
+
+		obj := <-one
+		<-two
+		this.NotNil(obj)
+		this.NoError(this.pool.ReturnObject(obj))
+
+		//Uncomment this for a progress indication
+		//		if i%10 == 0 {
+		//			fmt.Println(i)
+		//		}
+	}
 }
