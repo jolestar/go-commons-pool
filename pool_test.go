@@ -453,6 +453,7 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	borrowTime := <-ch
+	close(ch)
 	fmt.Println("TestWhenExhaustedBlockInterrupt borrowTime:", borrowTime)
 	this.True(borrowTime >= 200)
 
@@ -571,6 +572,7 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
 	ch := threadRun(borrower)
 	result := <-ch
+	close(ch)
 	fmt.Printf("TestEvictAddObjects %v error:%v", borrower, result.error)
 	this.True(!result.failed)
 }
@@ -866,6 +868,7 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 
 	for i := 0; i < numThreads; i++ {
 		result := <-resultChans[i]
+		close(resultChans[i])
 		if result.failed {
 			this.Fail("Thread %v failed: %v", i, result.error.Error())
 		}
@@ -1246,6 +1249,7 @@ func runTestThreads(t *testing.T, numThreads int, iterations int, delay int, tes
 
 	for i := 0; i < numThreads; i++ {
 		result := <-resultChans[i]
+		close(resultChans[i])
 		if result.failed {
 			assert.Fail(t, "Thread %v failed: %v", i, result.error.Error())
 		}
@@ -1289,13 +1293,17 @@ func concurrentBorrowAndEvictThread(borrow bool, pool *ObjectPool) chan interfac
 func (this *PoolTestSuite) TestConcurrentBorrowAndEvict() {
 	this.pool.Config.MaxTotal = 1
 	this.NoError(this.pool.AddObject())
+	//set MaxWaitMillis avoid test use too long time
+	this.pool.Config.MaxWaitMillis = 1000
 
 	for i := 0; i < 5000; i++ {
 		one := concurrentBorrowAndEvictThread(true, this.pool)
 		two := concurrentBorrowAndEvictThread(false, this.pool)
 
 		obj := <-one
+		close(one)
 		<-two
+		close(two)
 		this.NotNil(obj)
 		this.NoError(this.pool.ReturnObject(obj))
 
