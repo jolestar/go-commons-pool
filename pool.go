@@ -209,7 +209,7 @@ func (this *ObjectPool) updateStatsReturn(activeTime int64) {
 }
 
 func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, error) {
-	if this.closed {
+	if this.IsClosed() {
 		return nil, NewIllegalStatusErr("Pool not open")
 	}
 	ac := this.AbandonedConfig
@@ -346,6 +346,9 @@ func (this *ObjectPool) ensureIdle(idleCount int, always bool) {
 }
 
 func (this *ObjectPool) IsClosed() bool {
+	this.closeLock.Lock()
+	defer this.closeLock.Unlock()
+	// in java commons pool, closed is volatile, golang has not volatile, so use mutex to avoid data race
 	return this.closed
 }
 
@@ -469,7 +472,7 @@ func (this *ObjectPool) Close() {
 		return
 	}
 	this.closeLock.Lock()
-	if this.IsClosed() {
+	if this.closed {
 		return
 	}
 

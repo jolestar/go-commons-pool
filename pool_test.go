@@ -1156,3 +1156,39 @@ func (this *PoolTestSuite) TestConcurrentInvalidate() {
 	}
 	this.Equal(nIterations, this.pool.GetDestroyedCount())
 }
+
+func sleep(millisecond int) {
+	time.Sleep(time.Duration(millisecond) * time.Millisecond)
+}
+
+func (this *PoolTestSuite) TestMinIdle() {
+	this.pool.Config.MaxIdle = 500
+	this.pool.Config.MinIdle = 5
+	this.pool.Config.MaxTotal = 10
+	this.pool.Config.NumTestsPerEvictionRun = 0
+	this.pool.Config.MinEvictableIdleTimeMillis = int64(50)
+	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
+	this.pool.Config.TestWhileIdle = true
+	this.pool.StartEvictor()
+
+	sleep(150)
+	this.Equal(5, this.pool.GetNumIdle(), "Should be 5 idle, found %v", this.pool.GetNumIdle())
+
+	active := make([]*TestObject, 5)
+	active[0] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	sleep(150)
+	this.Equal(5, this.pool.GetNumIdle(), "Should be 5 idle, found %v", this.pool.GetNumIdle())
+
+	for i := 1; i < 5; i++ {
+		active[i] = this.NoErrorWithResult(this.pool.BorrowObject()).(*TestObject)
+	}
+
+	sleep(150)
+	this.Equal(5, this.pool.GetNumIdle(), "Should be 5 idle, found %v", this.pool.GetNumIdle())
+
+	for i := 0; i < 5; i++ {
+		this.NoError(this.pool.ReturnObject(active[i]))
+	}
+	sleep(150)
+	this.Equal(10, this.pool.GetNumIdle(), "Should be 10 idle, found %v", this.pool.GetNumIdle())
+}
