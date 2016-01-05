@@ -1402,8 +1402,6 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockClosePool() {
 	sleep(200)
 
 	// Check thread was interrupted
-	//go pool no custom InterruptedException,
-	//assertTrue(wtt._thrown instanceof InterruptedException);
 	result := <-ch
 	close(ch)
 	_, ok := result.error.(*collections.InterruptedErr)

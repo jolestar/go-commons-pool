@@ -130,7 +130,9 @@ func TestTimeoutCondHasWaiters(t *testing.T) {
 		wait.Done()
 	}()
 	time.Sleep(time.Duration(50) * time.Millisecond)
+	obj.lock.Lock()
 	assert.True(t, obj.cond.HasWaiters())
+	obj.lock.Unlock()
 	go func() {
 		obj.lockAndNotify()
 		wait.Done()
