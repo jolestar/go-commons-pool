@@ -6,8 +6,9 @@ import (
 )
 
 type TimeoutCond struct {
-	L      sync.Locker
-	signal chan int
+	L          sync.Locker
+	signal     chan int
+	hasWaiters bool
 }
 
 func NewTimeoutCond(l sync.Locker) *TimeoutCond {
@@ -19,26 +20,41 @@ func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 return remain wait time, and is interrupt
 */
 func (this *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
+	this.setHasWaiters(true)
+	ch := this.signal
 	//wait should unlock mutex,  if not will cause deadlock
 	this.L.Unlock()
+	defer this.setHasWaiters(false)
 	defer this.L.Lock()
+
 	begin := time.Now().Nanosecond()
 	select {
-	case _, ok := <-this.signal:
+	case _, ok := <-ch:
 		end := time.Now().Nanosecond()
-		return time.Duration(end - begin), !ok
+		remainTimeout := timeout - time.Duration(end-begin)
+		return remainTimeout, !ok
 	case <-time.After(timeout):
 		return 0, false
 	}
+}
+
+func (this *TimeoutCond) setHasWaiters(value bool) {
+	this.hasWaiters = value
+}
+
+func (this *TimeoutCond) HasWaiters() bool {
+	return this.hasWaiters
 }
 
 /**
 return is interrupt
 */
 func (this *TimeoutCond) Wait() bool {
+	this.setHasWaiters(true)
 	//copy signal in lock, avoid data race with Interrupt
 	ch := this.signal
 	this.L.Unlock()
+	defer this.setHasWaiters(false)
 	defer this.L.Lock()
 	_, ok := <-ch
 	return !ok
