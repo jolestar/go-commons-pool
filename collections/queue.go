@@ -12,6 +12,17 @@ const (
 	debug_queue = false
 )
 
+type InterruptedErr struct {
+}
+
+func NewInterruptedErr() *InterruptedErr {
+	return &InterruptedErr{}
+}
+
+func (this *InterruptedErr) Error() string {
+	return "Interrupted"
+}
+
 type Node struct {
 
 	/**
@@ -296,18 +307,21 @@ func (this *LinkedBlockDeque) PollFirst() (e interface{}) {
 	return result
 }
 
-func (this *LinkedBlockDeque) PollFirstWithTimeout(timeout time.Duration) (e interface{}) {
+func (this *LinkedBlockDeque) PollFirstWithTimeout(timeout time.Duration) (interface{}, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
 	interrupt := false
 	for x = this.unlinkFirst(); x == nil; x = this.unlinkFirst() {
-		if timeout <= 0 || interrupt {
+		if timeout <= 0 {
 			break
+		}
+		if interrupt {
+			return nil, NewInterruptedErr()
 		}
 		timeout, interrupt = this.notEmpty.WaitWithTimeout(timeout)
 	}
-	return x
+	return x, nil
 }
 
 func (this *LinkedBlockDeque) PollLast() interface{} {
@@ -317,18 +331,21 @@ func (this *LinkedBlockDeque) PollLast() interface{} {
 	return result
 }
 
-func (this *LinkedBlockDeque) PollLastWithTimeout(timeout time.Duration) (e interface{}) {
+func (this *LinkedBlockDeque) PollLastWithTimeout(timeout time.Duration) (interface{}, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
 	interrupt := false
 	for x = this.unlinkLast(); x == nil; x = this.unlinkLast() {
-		if timeout <= 0 || interrupt {
+		if timeout <= 0 {
 			break
+		}
+		if interrupt {
+			return nil, NewInterruptedErr()
 		}
 		timeout, interrupt = this.notEmpty.WaitWithTimeout(timeout)
 	}
-	return x
+	return x, nil
 }
 
 func (this *LinkedBlockDeque) Poll() (e interface{}) {
@@ -347,18 +364,18 @@ func (this *LinkedBlockDeque) Poll() (e interface{}) {
  *
  * @return the unlinked element
  */
-func (this *LinkedBlockDeque) TakeFirst() interface{} {
+func (this *LinkedBlockDeque) TakeFirst() (interface{}, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
 	interrupt := false
 	for x = this.unlinkFirst(); x == nil; x = this.unlinkFirst() {
 		if interrupt {
-			break
+			return nil, NewInterruptedErr()
 		}
 		interrupt = this.notEmpty.Wait()
 	}
-	return x
+	return x, nil
 }
 
 /**
@@ -368,18 +385,18 @@ func (this *LinkedBlockDeque) TakeFirst() interface{} {
  * @return the unlinked element
  * @throws InterruptedException if the current thread is interrupted
  */
-func (this *LinkedBlockDeque) TakeLast() interface{} {
+func (this *LinkedBlockDeque) TakeLast() (interface{}, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var x interface{}
 	interrupt := false
 	for x = this.unlinkLast(); x == nil; x = this.unlinkLast() {
 		if interrupt {
-			break
+			return nil, NewInterruptedErr()
 		}
 		interrupt = this.notEmpty.Wait()
 	}
-	return x
+	return x, nil
 }
 
 //func (this *LinkedBlockDeque) GetFirst() (interface{}) {
@@ -472,6 +489,14 @@ func (this *LinkedBlockDeque) InterruptTakeWaiters() {
 		fmt.Println("InterruptTakeWaiters")
 	}
 	this.notEmpty.Interrupt()
+}
+
+//Returns true if there are threads waiting to take instances from this deque.
+//See disclaimer on accuracy in  TimeoutCond.HasWaiters()
+func (this *LinkedBlockDeque) HasTakeWaiters() bool {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	return this.notEmpty.HasWaiters()
 }
 
 func (this *LinkedBlockDeque) Size() int {

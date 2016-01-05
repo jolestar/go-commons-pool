@@ -5,6 +5,7 @@ import (
 	"github.com/jolestar/go-commons-pool/concurrent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -18,6 +19,18 @@ var THREE = 3
 type LinkedBlockDequeTestSuite struct {
 	suite.Suite
 	deque *LinkedBlockDeque
+}
+
+func (this *LinkedBlockDequeTestSuite) NoErrorWithResult(object interface{}, err error) interface{} {
+	//this.NotNil(object)
+	this.Nil(err)
+	return object
+}
+
+func (this *LinkedBlockDequeTestSuite) ErrorWithResult(object interface{}, err error) error {
+	this.Nil(object)
+	this.NotNil(err)
+	return err
 }
 
 func TestLinkedBlockQueueTestSuite(t *testing.T) {
@@ -105,13 +118,13 @@ func (this *LinkedBlockDequeTestSuite) TestPollLast() {
 func (this *LinkedBlockDequeTestSuite) TestTakeFirst() {
 	assert.True(this.T(), this.deque.OfferFirst(ONE))
 	assert.True(this.T(), this.deque.OfferFirst(TWO))
-	assert.Equal(this.T(), TWO, this.deque.TakeFirst())
+	assert.Equal(this.T(), TWO, this.NoErrorWithResult(this.deque.TakeFirst()))
 }
 
 func (this *LinkedBlockDequeTestSuite) TestTakeLast() {
 	assert.True(this.T(), this.deque.OfferFirst(ONE))
 	assert.True(this.T(), this.deque.OfferFirst(TWO))
-	assert.Equal(this.T(), ONE, this.deque.TakeLast())
+	assert.Equal(this.T(), ONE, this.NoErrorWithResult(this.deque.TakeLast()))
 }
 
 func (this *LinkedBlockDequeTestSuite) TestRemoveLastOccurence() {
@@ -127,12 +140,12 @@ func (this *LinkedBlockDequeTestSuite) TestRemoveLastOccurence() {
 
 func (this *LinkedBlockDequeTestSuite) TestPollFirstWithTimeout() {
 	assert.Nil(this.T(), this.deque.PollFirst())
-	assert.Nil(this.T(), this.deque.PollFirstWithTimeout(50*time.Millisecond))
+	assert.Nil(this.T(), this.NoErrorWithResult(this.deque.PollFirstWithTimeout(50*time.Millisecond)))
 }
 
 func (this *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
 	assert.Nil(this.T(), this.deque.PollLast())
-	assert.Nil(this.T(), this.deque.PollLastWithTimeout(50*time.Millisecond))
+	assert.Nil(this.T(), this.NoErrorWithResult(this.deque.PollLastWithTimeout(50*time.Millisecond)))
 }
 
 func (this *LinkedBlockDequeTestSuite) TestInterrupt() {
@@ -146,8 +159,11 @@ func (this *LinkedBlockDequeTestSuite) TestInterrupt() {
 			wait.Done()
 		}
 	}()
-	assert.Nil(this.T(), this.deque.TakeFirst())
-	assert.Nil(this.T(), this.deque.TakeFirst())
+	for i := 0; i < 2; i++ {
+		_, e := this.deque.TakeFirst()
+		_, ok := e.(*InterruptedErr)
+		this.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
+	}
 	wait.Wait()
 }
 
@@ -241,7 +257,7 @@ func (this *LinkedBlockDequeTestSuite) TestQueueLock() {
 	this.deque = NewDeque(1)
 	ch := make(chan int)
 	go func() {
-		ch <- this.deque.TakeFirst().(int)
+		ch <- this.NoErrorWithResult(this.deque.TakeFirst()).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	//time.Sleep(time.Duration(1)*time.Second)
@@ -250,32 +266,143 @@ func (this *LinkedBlockDequeTestSuite) TestQueueLock() {
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
+	close(ch)
 	this.Equal(1, val)
 }
 
 func (this *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 	this.deque = NewDeque(10)
-	ch := make(chan int)
 	count := 100
+	ch := make(chan int, count)
 	for i := 0; i < count; i++ {
 		go func() {
-			ch <- this.deque.TakeFirst().(int)
+			ch <- this.NoErrorWithResult(this.deque.TakeFirst()).(int)
 		}()
 	}
+	sleep(100)
 	for i := 0; i < count; i++ {
 		go func(val int) {
-			this.deque.PutLast(val)
+			this.deque.AddFirst(val)
 		}(i)
 	}
 	values := make([]int, count)
-	valueset := make(map[int]int, count)
+	valueset := make(map[int]int)
 	for i := 0; i < count; i++ {
 		val := <-ch
 		values[i] = val
 		valueset[val] = val
 	}
 	fmt.Println("TestQueueConcurrent", values)
-	this.Equal(count, len(values))
 	this.Equal(count, len(valueset))
+	close(ch)
 	//this.Equal(1, val)
+}
+
+func currentTimeMillis() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+func sleep(millisecond int) {
+	time.Sleep(time.Duration(millisecond) * time.Millisecond)
+}
+
+func (this *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
+	this.deque = NewDeque(10)
+	count := 20
+	ch := make(chan int, count/2)
+	timeoutChan := make(chan int, count/2)
+	timeout := 1000
+	for i := 0; i < count; i++ {
+		go func() {
+			startWait := currentTimeMillis()
+			r := this.NoErrorWithResult(this.deque.PollFirstWithTimeout(time.Duration(timeout) * time.Millisecond))
+			endWait := currentTimeMillis()
+			//timeout
+			if r == nil {
+				timeoutChan <- int((endWait - startWait))
+			} else {
+				ch <- r.(int)
+			}
+		}()
+	}
+	for i := 0; i < count/2; i++ {
+		go func(val int) {
+			sleep(int(rand.Int31n(int32(timeout))))
+			this.deque.AddFirst(val)
+		}(i)
+	}
+	for i := 0; i < count/2; i++ {
+		t := <-timeoutChan
+		//fmt.Println(t)
+		if t < timeout {
+			this.Fail(fmt.Sprintf("%v timeout %v < 1000", t, i))
+		}
+	}
+	close(timeoutChan)
+	valueset := make(map[int]int)
+	for i := 0; i < count/2; i++ {
+		val := <-ch
+		valueset[val] = val
+	}
+	close(ch)
+	this.Equal(count/2, len(valueset))
+}
+
+func (this *LinkedBlockDequeTestSuite) TestQueuePutAndPullTimeout() {
+	this.deque = NewDeque(1)
+	ch := make(chan int)
+	timeout := time.Duration(500) * time.Millisecond
+	go func() {
+		ch <- this.NoErrorWithResult(this.deque.PollFirstWithTimeout(timeout)).(int)
+		fmt.Printf("TestQueueLock take finish.\n")
+	}()
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	go func() {
+		this.deque.PutFirst(1)
+		fmt.Printf("TestQueueLock put finish.\n")
+	}()
+	val := <-ch
+	close(ch)
+	this.Equal(1, val)
+}
+
+func (this *LinkedBlockDequeTestSuite) TestHasTakeWaitersWithTimeout() {
+	this.deque = NewDeque(1)
+	this.False(this.deque.HasTakeWaiters())
+	timeout := time.Duration(500) * time.Millisecond
+	ch := make(chan int)
+	go func() {
+		ch <- this.NoErrorWithResult(this.deque.PollFirstWithTimeout(timeout)).(int)
+		fmt.Printf("TestQueueLock take finish.\n")
+	}()
+	time.Sleep(time.Duration(50) * time.Millisecond)
+	this.True(this.deque.HasTakeWaiters())
+	go func() {
+		this.deque.PutFirst(1)
+		fmt.Printf("TestQueueLock put finish.\n")
+	}()
+	val := <-ch
+	close(ch)
+	this.Equal(1, val)
+	this.False(this.deque.HasTakeWaiters())
+}
+
+func (this *LinkedBlockDequeTestSuite) TestHasTakeWaiters() {
+	this.deque = NewDeque(1)
+	this.False(this.deque.HasTakeWaiters())
+	ch := make(chan int)
+	go func() {
+		ch <- this.NoErrorWithResult(this.deque.TakeFirst()).(int)
+		fmt.Printf("TestQueueLock take finish.\n")
+	}()
+	time.Sleep(time.Duration(50) * time.Millisecond)
+	this.True(this.deque.HasTakeWaiters())
+	go func() {
+		this.deque.PutFirst(1)
+		fmt.Printf("TestQueueLock put finish.\n")
+	}()
+	val := <-ch
+	close(ch)
+	this.Equal(1, val)
+	this.False(this.deque.HasTakeWaiters())
 }
