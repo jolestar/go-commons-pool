@@ -39,19 +39,20 @@ func NewNoSuchElementErr(msg string) *NoSuchElementErr {
 }
 
 type ObjectPool struct {
-	AbandonedConfig         *AbandonedConfig
-	Config                  *ObjectPoolConfig
-	closed                  bool
-	closeLock               sync.Mutex
-	evictionLock            sync.Mutex
-	idleObjects             *collections.LinkedBlockDeque
-	allObjects              *collections.SyncIdentityMap
-	factory                 PooledObjectFactory
-	createCount             concurrent.AtomicInteger
-	destroyedByEvictorCount concurrent.AtomicInteger
-	destroyedCount          concurrent.AtomicInteger
-	evictor                 *time.Ticker
-	evictionIterator        collections.Iterator
+	AbandonedConfig                  *AbandonedConfig
+	Config                           *ObjectPoolConfig
+	closed                           bool
+	closeLock                        sync.Mutex
+	evictionLock                     sync.Mutex
+	idleObjects                      *collections.LinkedBlockDeque
+	allObjects                       *collections.SyncIdentityMap
+	factory                          PooledObjectFactory
+	createCount                      concurrent.AtomicInteger
+	destroyedByEvictorCount          concurrent.AtomicInteger
+	destroyedCount                   concurrent.AtomicInteger
+	destroyedByBorrowValidationCount concurrent.AtomicInteger
+	evictor                          *time.Ticker
+	evictionIterator                 collections.Iterator
 }
 
 func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
@@ -122,6 +123,10 @@ func (this *ObjectPool) GetNumActive() int {
 
 func (this *ObjectPool) GetDestroyedCount() int {
 	return int(this.destroyedCount.Get())
+}
+
+func (this *ObjectPool) GetDestroyedByBorrowValidationCount() int {
+	return int(this.destroyedByBorrowValidationCount.Get())
 }
 
 func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
@@ -244,22 +249,30 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 			}
 			if p == nil {
 				if borrowMaxWaitMillis < 0 {
-					p, ok = this.idleObjects.TakeFirst().(*PooledObject)
+					obj, err := this.idleObjects.TakeFirst()
+					if err != nil {
+						return nil, err
+					}
+					p, ok = obj.(*PooledObject)
 				} else {
-					p, ok = this.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond).(*PooledObject)
+					beginWait := currentTimeMillis()
+					obj, err := this.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond)
+					endWait := currentTimeMillis()
+					if debug_pool && obj == nil {
+						fmt.Printf("pool borrowMaxWaitMillis:%v realWait:%v but return nil \n", borrowMaxWaitMillis, (endWait - beginWait))
+					}
+					if err != nil {
+						return nil, err
+					}
+					p, ok = obj.(*PooledObject)
 				}
-			}
-			if debug_pool {
-				fmt.Printf("pool ok:%v,  p:%v \n", ok, p)
+
 			}
 			if !ok {
 				return nil, NewNoSuchElementErr("Timeout waiting for idle object")
 			}
 			if !p.Allocate() {
 				p = nil
-			}
-			if debug_pool {
-				fmt.Printf("pool p.Allocate p:%v \n", p)
 			}
 		} else {
 			p, ok = this.idleObjects.PollFirst().(*PooledObject)
@@ -270,7 +283,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				}
 			}
 			if p == nil {
-				return nil, NewNoSuchElementErr("Timeout waiting for idle object")
+				return nil, NewNoSuchElementErr("Pool exhausted")
 			}
 			if !p.Allocate() {
 				p = nil
@@ -286,7 +299,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				this.destroy(p)
 				p = nil
 				if create {
-					return nil, NewNoSuchElementErr("Timeout waiting for idle object")
+					return nil, NewNoSuchElementErr("Unable to activate object")
 				}
 			}
 		}
@@ -297,7 +310,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 			validate := this.factory.ValidateObject(p)
 			if !validate {
 				this.destroy(p)
-				//destroyedByBorrowValidationCount.incrementAndGet()
+				this.destroyedByBorrowValidationCount.IncrementAndGet()
 				p = nil
 				if create {
 					return nil, NewNoSuchElementErr("Unable to validate object")
@@ -318,9 +331,7 @@ func (this *ObjectPool) isAbandonedConfig() bool {
 }
 
 func (this *ObjectPool) ensureIdle(idleCount int, always bool) {
-	//if (idleCount < 1 || this.IsClosed() || (!always && !this.idleObjects.hasTakeWaiters())) {
-	//TODO how to implement this.idleObjects.hasTakeWaiters()?
-	if idleCount < 1 || this.IsClosed() || !always {
+	if idleCount < 1 || this.IsClosed() || (!always && !this.idleObjects.HasTakeWaiters()) {
 		return
 	}
 
@@ -499,7 +510,7 @@ func (this *ObjectPool) startEvictor(delay int64) {
 	if nil != this.evictor {
 		this.evictor.Stop()
 		this.evictor = nil
-		//evictionIterator = null;
+		this.evictionIterator = nil
 	}
 	if delay > 0 {
 		this.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)

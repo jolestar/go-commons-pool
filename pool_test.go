@@ -3,6 +3,7 @@ package pool
 import (
 	"errors"
 	"fmt"
+	"github.com/jolestar/go-commons-pool/collections"
 	"github.com/jolestar/go-commons-pool/concurrent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -45,12 +46,20 @@ func NewSimpleFactory() *SimpleFactory {
 }
 
 func (this *SimpleFactory) setValid(valid bool) {
+	this.lock.Lock()
 	this.evenValid = valid
 	this.oddValid = valid
+	this.lock.Unlock()
 }
 
-func (this *SimpleFactory) doWait(latency time.Duration) {
-	time.Sleep(latency)
+func (this *SimpleFactory) setValidateLatency(validateLatency int64) {
+	this.lock.Lock()
+	this.validateLatency = validateLatency
+	this.lock.Unlock()
+}
+
+func (this *SimpleFactory) doWait(latencyMillisecond int64) {
+	time.Sleep(time.Duration(latencyMillisecond) * time.Millisecond)
 }
 
 func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
@@ -66,7 +75,7 @@ func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
 	waitLatency = this.makeLatency
 	this.lock.Unlock()
 	if waitLatency > 0 {
-		this.doWait(time.Duration(waitLatency))
+		this.doWait(waitLatency)
 	}
 	var counter int
 	this.lock.Lock()
@@ -87,7 +96,7 @@ func (this *SimpleFactory) DestroyObject(object *PooledObject) error {
 	hurl = this.exceptionOnDestroy
 	this.lock.Unlock()
 	if waitLatency > 0 {
-		this.doWait(time.Duration(waitLatency))
+		this.doWait(waitLatency)
 	}
 	this.lock.Lock()
 	this.activeCount = this.activeCount - 1
@@ -116,7 +125,7 @@ func (this *SimpleFactory) ValidateObject(object *PooledObject) bool {
 	waitLatency = this.validateLatency
 	this.lock.Unlock()
 	if waitLatency > 0 {
-		this.doWait(time.Duration(waitLatency))
+		this.doWait(waitLatency)
 	}
 	if validate {
 		if counter%2 == 0 {
@@ -313,6 +322,31 @@ func (this *PoolTestSuite) TestBaseBorrowReturn() {
 	}
 }
 
+func (this *PoolTestSuite) TestBorrowReturnAsync() {
+	this.pool.Config.MaxTotal = 1
+	this.pool.Config.MaxWaitMillis = 1000
+
+	obj0 := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.assertEquals(getNthObject(0), obj0)
+
+	//start new goroutine to borrow will block
+	ch := make(chan interface{}, 1)
+	go func() {
+		obj, _ := this.pool.BorrowObject()
+		ch <- obj
+	}()
+	sleep(100)
+
+	//return obj0
+	go func() {
+		this.pool.ReturnObject(obj0)
+	}()
+	sleep(100)
+	obj1 := <-ch
+	this.NotNil(obj1)
+	this.Equal(obj0, obj1)
+}
+
 func (this *PoolTestSuite) TestBaseNumActiveNumIdle() {
 	this.pool.Config.MaxTotal = 3
 
@@ -497,9 +531,14 @@ type TestThreadArg struct {
 }
 
 type TestThreadResult struct {
-	complete bool
-	failed   bool
-	error    error
+	complete   bool
+	failed     bool
+	error      error
+	preborrow  int64
+	postborrow int64
+	postreturn int64
+	ended      int64
+	objectId   interface{}
 }
 
 func NewTesThreadArgSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestThreadArg {
@@ -512,7 +551,7 @@ func NewTestThreadArg(pool *ObjectPool, iter int, startDelay int,
 }
 
 func threadRun(arg *TestThreadArg) chan TestThreadResult {
-	resultChan := make(chan TestThreadResult)
+	resultChan := make(chan TestThreadResult, 1)
 	result := TestThreadResult{}
 	go func() {
 		for i := 0; i < arg.iter; i++ {
@@ -528,23 +567,28 @@ func threadRun(arg *TestThreadArg) chan TestThreadResult {
 			} else {
 				holdTime = arg.holdTime
 			}
-			time.Sleep(time.Duration(startDelay) * time.Millisecond)
+			sleep(startDelay)
+			startBorrow := currentTimeMillis()
 			obj, err := arg.pool.BorrowObject()
+			endBorrow := currentTimeMillis()
 			if err != nil {
+				fmt.Println("borrow error, time:", endBorrow-startBorrow)
 				result.error = err
 				result.failed = true
 				result.complete = true
 				break
 			}
-
 			if arg.expectedObject != nil && !(arg.expectedObject == obj) {
 				result.error = fmt.Errorf("Expected: %v found: %v", arg.expectedObject, obj)
 				result.failed = true
 				result.complete = true
 				break
 			}
-			time.Sleep(time.Duration(holdTime) * time.Millisecond)
+			sleep(holdTime)
+			//startReturn := currentTimeMillis()
 			err = arg.pool.ReturnObject(obj)
+			//endReturn := currentTimeMillis()
+			//fmt.Println("returnTime:", endReturn - startReturn)
 			if err != nil {
 				result.error = err
 				result.failed = true
@@ -870,7 +914,7 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 		result := <-resultChans[i]
 		close(resultChans[i])
 		if result.failed {
-			this.Fail("Thread %v failed: %v", i, result.error.Error())
+			this.Fail(fmt.Sprintf("Thread %v failed: %v", i, result.error.Error()))
 		}
 	}
 }
@@ -1246,13 +1290,21 @@ func runTestThreads(t *testing.T, numThreads int, iterations int, delay int, tes
 	for i := 0; i < numThreads; i++ {
 		resultChans[i] = threadRun(arg)
 	}
-
+	results := make([]TestThreadResult, numThreads)
+	failedThreads := make([]int, 0)
 	for i := 0; i < numThreads; i++ {
 		result := <-resultChans[i]
+		results[i] = result
 		close(resultChans[i])
 		if result.failed {
-			assert.Fail(t, "Thread %v failed: %v", i, result.error.Error())
+			failedThreads = append(failedThreads, i)
 		}
+	}
+	if len(failedThreads) > 0 {
+		for _, t := range failedThreads {
+			fmt.Printf("Thread %v failed %v \n", t, results[t].error)
+		}
+		assert.Fail(t, fmt.Sprintf("Thread %v failed", failedThreads))
 	}
 }
 
@@ -1313,3 +1365,377 @@ func (this *PoolTestSuite) TestConcurrentBorrowAndEvict() {
 		//		}
 	}
 }
+
+//Verifies that concurrent threads never "share" instances
+func (this *PoolTestSuite) TestNoInstanceOverlap() {
+	maxTotal := 5
+	numThreads := 100
+	delay := 1
+	iterations := 1000
+	this.pool.Config.MaxTotal = maxTotal
+	this.pool.Config.MaxIdle = maxTotal
+	this.pool.Config.TestOnBorrow = true
+	this.pool.Config.BlockWhenExhausted = true
+	this.pool.Config.MaxWaitMillis = int64(-1)
+	runTestThreads(this.T(), numThreads, iterations, delay, this.pool)
+	this.Equal(0, this.pool.GetDestroyedByBorrowValidationCount())
+}
+
+func (this *PoolTestSuite) TestWhenExhaustedBlockClosePool() {
+	this.pool.Config.MaxTotal = 1
+	this.pool.Config.BlockWhenExhausted = true
+	this.pool.Config.MaxWaitMillis = int64(-1)
+	obj1 := this.NoErrorWithResult(this.pool.BorrowObject())
+
+	// Make sure an object was obtained
+	this.NotNil(obj1)
+
+	// Create a separate thread to try and borrow another object
+	ch := waitTestThread(this.pool, 200)
+	// Give wtt time to start
+	sleep(200)
+
+	// close the pool (Bug POOL-189)
+	this.pool.Close()
+
+	// Give interrupt time to take effect
+	sleep(200)
+
+	// Check thread was interrupted
+	//go pool no custom InterruptedException,
+	//assertTrue(wtt._thrown instanceof InterruptedException);
+	result := <-ch
+	close(ch)
+	_, ok := result.error.(*collections.InterruptedErr)
+	this.True(ok, "expect InterruptedErr, but get: %v", reflect.TypeOf(result.error))
+}
+
+func waitTestThread(pool *ObjectPool, pause int) chan TestThreadResult {
+	ch := make(chan TestThreadResult, 1)
+	go func() {
+		result := TestThreadResult{}
+		result.preborrow = currentTimeMillis()
+		obj, err := pool.BorrowObject()
+		result.objectId = obj
+		result.postborrow = currentTimeMillis()
+		if err == nil {
+			sleep(pause)
+			pool.ReturnObject(obj)
+		}
+		result.complete = true
+		result.error = err
+		result.failed = err != nil
+		result.postreturn = currentTimeMillis()
+		result.ended = currentTimeMillis()
+		ch <- result
+	}()
+	return ch
+}
+
+func (this *PoolTestSuite) TestFIFO() {
+	this.pool.Config.Lifo = false
+	this.NoError(this.pool.AddObject()) // "0"
+	this.NoError(this.pool.AddObject()) // "1"
+	this.NoError(this.pool.AddObject()) // "2"
+	this.Equal(getNthObject(0), this.NoErrorWithResult(this.pool.BorrowObject()), "Oldest")
+	this.Equal(getNthObject(1), this.NoErrorWithResult(this.pool.BorrowObject()), "Middle")
+	this.Equal(getNthObject(2), this.NoErrorWithResult(this.pool.BorrowObject()), "Youngest")
+	o := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.Equal(getNthObject(3), o, "new-3")
+	this.NoError(this.pool.ReturnObject(o))
+	this.Equal(o, this.NoErrorWithResult(this.pool.BorrowObject()), "returned-3")
+	this.Equal(getNthObject(4), this.NoErrorWithResult(this.pool.BorrowObject()), "new-4")
+}
+
+func (this *PoolTestSuite) TestLIFO() {
+	this.pool.Config.Lifo = true
+	this.NoError(this.pool.AddObject()) // "0"
+	this.NoError(this.pool.AddObject()) // "1"
+	this.NoError(this.pool.AddObject()) // "2"
+	this.Equal(getNthObject(2), this.NoErrorWithResult(this.pool.BorrowObject()), "Youngest")
+	this.Equal(getNthObject(1), this.NoErrorWithResult(this.pool.BorrowObject()), "Middle")
+	this.Equal(getNthObject(0), this.NoErrorWithResult(this.pool.BorrowObject()), "Oldest")
+	o := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.Equal(getNthObject(3), o, "new-3")
+	this.NoError(this.pool.ReturnObject(o))
+	this.Equal(o, this.NoErrorWithResult(this.pool.BorrowObject()), "returned-3")
+	this.Equal(getNthObject(4), this.NoErrorWithResult(this.pool.BorrowObject()), "new-4")
+}
+
+func (this *PoolTestSuite) TestAddObject() {
+	this.Equal(0, this.pool.GetNumIdle(), "should be zero idle")
+	this.NoError(this.pool.AddObject())
+	this.Equal(1, this.pool.GetNumIdle(), "should be one idle")
+	this.Equal(0, this.pool.GetNumActive(), "should be zero active")
+	obj := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.Equal(0, this.pool.GetNumIdle(), "should be zero idle")
+	this.Equal(1, this.pool.GetNumActive(), "should be one active")
+	this.NoError(this.pool.ReturnObject(obj))
+	this.Equal(1, this.pool.GetNumIdle(), "should be one idle")
+	this.Equal(0, this.pool.GetNumActive(), "should be zero active")
+}
+
+//TODO
+//func (this *PoolTestSuite)  TestBorrowObjectFairness() {}
+
+/**
+ * On first borrow, first object fails validation, second object is OK.
+ * Subsequent borrows are OK. This was POOL-152.
+ */
+func (this *PoolTestSuite) TestBrokenFactoryShouldNotBlockPool() {
+	maxTotal := 1
+
+	this.factory.maxTotal = maxTotal
+	this.pool.Config.MaxTotal = maxTotal
+	this.pool.Config.BlockWhenExhausted = true
+	this.pool.Config.TestOnBorrow = true
+
+	// First borrow object will need to create a new object which will fail
+	// validation.
+	this.factory.setValid(false)
+	obj, ex := this.pool.BorrowObject()
+	// Failure expected
+	_, ok := ex.(*NoSuchElementErr)
+	this.True(ok, "expect NoSuchElementErr, but get: %v", reflect.TypeOf(ex))
+	this.Nil(obj)
+
+	// Configure factory to create valid objects so subsequent borrows work
+	this.factory.setValid(true)
+
+	// Subsequent borrows should be OK
+	obj = this.NoErrorWithResult(this.pool.BorrowObject())
+	this.NoError(this.pool.ReturnObject(obj))
+}
+
+var DISPLAY_THREAD_DETAILS = true
+
+/*
+ * Test multi-threaded pool access.
+ * Multiple threads, but maxTotal only allows half the threads to succeed.
+ *
+ * This test was prompted by Continuum build failures in the Commons DBCP test case:
+ * TestPerUserPoolDataSource.testMultipleThreads2()
+ * Let's see if the this fails on Continuum too!
+ */
+func (this *PoolTestSuite) TestMaxWaitMultiThreaded() {
+	maxWait := 500          // wait for connection
+	holdTime := 2 * maxWait // how long to hold connection
+	threads := 10           // number of threads to grab the object initially
+	this.pool.Config.BlockWhenExhausted = true
+	this.pool.Config.MaxWaitMillis = int64(maxWait)
+	this.pool.Config.MaxTotal = threads
+	// Create enough threads so half the threads will have to wait
+	resultChans := make([]chan TestThreadResult, threads*2)
+	origin := currentTimeMillis() - 1000
+	for i := 0; i < len(resultChans); i++ {
+		resultChans[i] = waitTestThread(this.pool, holdTime)
+	}
+	var failed int = 0
+	results := make([]TestThreadResult, len(resultChans))
+	for i := 0; i < len(resultChans); i++ {
+		ch := resultChans[i]
+		result := <-ch
+		close(ch)
+		results[i] = result
+		if result.error != nil {
+			failed++
+		}
+	}
+	if DISPLAY_THREAD_DETAILS || len(resultChans)/2 != failed {
+		fmt.Println(
+			"MaxWait: ", maxWait,
+			" HoldTime: ", holdTime,
+			" MaxTotal: ", threads,
+			" Threads: ", len(resultChans),
+			" Failed: ", failed)
+		for _, result := range results {
+			fmt.Println(
+				"Preborrow: ", (result.preborrow - origin),
+				" Postborrow: ", (result.postborrow - origin),
+				" BorrowTime: ", (result.postborrow - result.preborrow),
+				" PostReturn: ", (result.postreturn - origin),
+				" Ended: ", (result.ended - origin),
+				" ObjId: ", result.objectId)
+		}
+	}
+	this.Equal(len(resultChans)/2, failed, "Expected half the threads to fail")
+}
+
+/**
+* Test the following scenario:
+*   Thread 1 borrows an instance
+*   Thread 2 starts to borrow another instance before thread 1 returns its instance
+*   Thread 1 returns its instance while thread 2 is validating its newly created instance
+* The test verifies that the instance created by Thread 2 is not leaked.
+ */
+func (this *PoolTestSuite) TestMakeConcurrentWithReturn() {
+	this.pool.Config.TestOnBorrow = true
+	this.factory.setValid(true)
+	// Borrow and return an instance, with a short wait
+	ch := waitTestThread(this.pool, 200)
+	sleep(50) // wait for validation to succeed
+	// Slow down validation and borrow an instance
+	this.factory.setValidateLatency(400)
+	instance := this.NoErrorWithResult(this.pool.BorrowObject())
+	// Now make sure that we have not leaked an instance
+	this.Equal(this.factory.makeCounter, this.pool.GetNumIdle()+1)
+	this.NoError(this.pool.ReturnObject(instance))
+	this.Equal(this.factory.makeCounter, this.pool.GetNumIdle())
+	<-ch
+	close(ch)
+}
+
+/**
+ * Verify that threads waiting on a depleted pool get served when a checked out object is
+ * invalidated.
+ *
+ * JIRA: POOL-240
+ */
+func (this *PoolTestSuite) TestInvalidateFreesCapacity() {
+	this.pool.Config.MaxTotal = 2
+	this.pool.Config.MaxWaitMillis = 500
+	this.pool.Config.BlockWhenExhausted = true
+	// Borrow an instance and hold if for 5 seconds
+	ch1 := waitTestThread(this.pool, 5000)
+	// Borrow another instance
+	obj := this.NoErrorWithResult(this.pool.BorrowObject())
+	// Launch another thread - will block, but fail in 500 ms
+	ch2 := waitTestThread(this.pool, 100)
+	// Invalidate the object borrowed by this thread - should allow thread2 to create
+	sleep(20)
+	this.NoError(this.pool.InvalidateObject(obj))
+	sleep(600) // Wait for thread2 to timeout
+	result2 := <-ch2
+	close(ch2)
+	if result2.error != nil {
+		this.Fail(result2.error.Error())
+	}
+	<-ch1
+	close(ch1)
+}
+
+/**
+* Verify that threads waiting on a depleted pool get served when a returning object fails
+* validation.
+*
+* JIRA: POOL-240
+*
+ */
+func (this *PoolTestSuite) TestValidationFailureOnReturnFreesCapacity() {
+	this.factory.setValid(false) // Validate will always fail
+	this.factory.enableValidation = true
+	this.pool.Config.MaxTotal = 2
+	this.pool.Config.MaxWaitMillis = int64(1500)
+	this.pool.Config.TestOnReturn = true
+	this.pool.Config.TestOnBorrow = false
+	// Borrow an instance and hold if for 5 seconds
+	ch1 := waitTestThread(this.pool, 5000)
+	// Borrow another instance and return it after 500 ms (validation will fail)
+	ch2 := waitTestThread(this.pool, 500)
+	sleep(50)
+	// Try to borrow an object
+	obj := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.NoError(this.pool.ReturnObject(obj))
+	<-ch1
+	close(ch1)
+	<-ch2
+	close(ch2)
+}
+
+//TODO
+//func (this *PoolTestSuite) TestSwallowedExceptionListener() {
+//}
+
+// POOL-248
+func (this *PoolTestSuite) TestMultipleReturnOfSameObject() {
+	this.Equal(0, this.pool.GetNumActive())
+	this.Equal(0, this.pool.GetNumIdle())
+
+	obj := this.NoErrorWithResult(this.pool.BorrowObject())
+
+	this.Equal(1, this.pool.GetNumActive())
+	this.Equal(0, this.pool.GetNumIdle())
+
+	this.NoError(this.pool.ReturnObject(obj))
+
+	this.Equal(0, this.pool.GetNumActive())
+	this.Equal(1, this.pool.GetNumIdle())
+
+	err := this.pool.ReturnObject(obj)
+	_, ok := err.(*IllegalStatusErr)
+	this.True(ok, "expect IllegalStatusErr, but get %v", reflect.TypeOf(err))
+	this.Equal(0, this.pool.GetNumActive())
+	this.Equal(1, this.pool.GetNumIdle())
+}
+
+// TODO POOL-259
+//func (this *PoolTestSuite) TestClientWaitStats() {
+//}
+
+// POOL-276
+func (this *PoolTestSuite) TestValidationOnCreateOnly() {
+	this.pool.Config.MaxTotal = 1
+	this.pool.Config.TestOnCreate = true
+	this.pool.Config.TestOnBorrow = false
+	this.pool.Config.TestOnReturn = false
+	this.pool.Config.TestWhileIdle = false
+
+	o1 := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.Equal(getNthObject(0), o1)
+	go func() {
+		sleep(3000)
+		this.pool.ReturnObject(o1)
+	}()
+
+	o2 := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.Equal(getNthObject(0), o2)
+
+	this.Equal(1, this.factory.validateCounter)
+}
+
+/**
+* Verifies that when a factory's makeObject produces instances that are not
+* discernible by == , the pool can handle them.
+*
+* JIRA: POOL-283
+ */
+func (this *PoolTestSuite) TestEqualsIndiscernible() {
+	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(func() (interface{}, error) {
+		return make(map[string]string), nil
+	}))
+	m1 := this.NoErrorWithResult(pool.BorrowObject())
+	m2 := this.NoErrorWithResult(pool.BorrowObject())
+	this.NoError(pool.ReturnObject(m1))
+	this.NoError(pool.ReturnObject(m2))
+	pool.Close()
+}
+
+/**
+ * Verifies that when a borrowed object is mutated in a way that does not
+ * preserve equality and hashcode, the pool can recognized it on return.
+ *
+ * JIRA: POOL-284
+ */
+func (this *PoolTestSuite) TestMutable() {
+	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(func() (interface{}, error) {
+		return make(map[string]string), nil
+	}))
+	m1 := this.NoErrorWithResult(pool.BorrowObject()).(map[string]string)
+	m2 := this.NoErrorWithResult(pool.BorrowObject()).(map[string]string)
+	m1["k1"] = "v1"
+	m2["k2"] = "v2"
+	this.NoError(pool.ReturnObject(m1))
+	this.NoError(pool.ReturnObject(m2))
+	this.Equal(2, pool.GetNumIdle())
+	pool.Close()
+}
+
+/**
+* Verifies that returning an object twice (without borrow in between) causes ISE
+* but does not re-validate or re-passivate the instance.
+*
+* JIRA: POOL-285
+ */
+//TODO
+//func (this *PoolTestSuite) TestMultipleReturn() {
+//}
