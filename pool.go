@@ -553,6 +553,14 @@ func (this *ObjectPool) evict() {
 	if debug_pool {
 		fmt.Printf("pool evict idle: %v \n", this.idleObjects.Size())
 	}
+
+	defer func() {
+		ac := this.AbandonedConfig
+		if ac != nil && ac.RemoveAbandonedOnMaintenance {
+			this.removeAbandoned(ac)
+		}
+	}()
+
 	if this.idleObjects.Size() == 0 {
 		return
 	}
@@ -634,10 +642,6 @@ func (this *ObjectPool) evict() {
 		}
 	}
 
-	ac := this.AbandonedConfig
-	if ac != nil && ac.RemoveAbandonedOnMaintenance {
-		this.removeAbandoned(ac)
-	}
 }
 
 func (this *ObjectPool) ensureMinIdle() {
