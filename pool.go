@@ -472,6 +472,7 @@ func (this *ObjectPool) Close() {
 		return
 	}
 	this.closeLock.Lock()
+	defer this.closeLock.Unlock()
 	if this.closed {
 		return
 	}
@@ -486,7 +487,6 @@ func (this *ObjectPool) Close() {
 
 	// Release any threads that were waiting for an object
 	this.idleObjects.InterruptTakeWaiters()
-	this.closeLock.Unlock()
 }
 
 //if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call this method to let it to take effect.
@@ -496,6 +496,7 @@ func (this *ObjectPool) StartEvictor() {
 
 func (this *ObjectPool) startEvictor(delay int64) {
 	this.evictionLock.Lock()
+	defer this.evictionLock.Unlock()
 	if nil != this.evictor {
 		this.evictor.Stop()
 		this.evictor = nil
@@ -510,7 +511,6 @@ func (this *ObjectPool) startEvictor(delay int64) {
 			}
 		}()
 	}
-	this.evictionLock.Unlock()
 }
 
 func (this *ObjectPool) getEvictionPolicy() EvictionPolicy {
