@@ -272,7 +272,7 @@ func (this *LinkedBlockDequeTestSuite) TestQueueLock() {
 
 func (this *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 	this.deque = NewDeque(10)
-	count := 100
+	count := 30
 	ch := make(chan int, count)
 	for i := 0; i < count; i++ {
 		go func() {
