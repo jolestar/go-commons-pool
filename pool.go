@@ -564,90 +564,95 @@ func (this *ObjectPool) evict() {
 	if debug_pool {
 		fmt.Printf("pool evict idle: %v \n", this.idleObjects.Size())
 	}
-	if this.idleObjects.Size() > 0 {
-		var underTest *PooledObject
-		evictionPolicy := this.getEvictionPolicy()
-		this.evictionLock.Lock()
-		defer this.evictionLock.Unlock()
 
-		evictionConfig := EvictionConfig{
-			IdleEvictTime:     this.Config.MinEvictableIdleTimeMillis,
-			IdleSoftEvictTime: this.Config.SoftMinEvictableIdleTimeMillis,
-			MinIdle:           this.Config.MinIdle}
+	defer func() {
+		ac := this.AbandonedConfig
+		if ac != nil && ac.RemoveAbandonedOnMaintenance {
+			this.removeAbandoned(ac)
+		}
+	}()
 
-		testWhileIdle := this.Config.TestWhileIdle
-		for i, m := 0, this.getNumTests(); i < m; i++ {
-			if this.evictionIterator == nil || !this.evictionIterator.HasNext() {
-				this.evictionIterator = this.EvictionIterator()
+	if this.idleObjects.Size() == 0 {
+		return
+	}
+	var underTest *PooledObject
+	evictionPolicy := this.getEvictionPolicy()
+	this.evictionLock.Lock()
+	defer this.evictionLock.Unlock()
+
+	evictionConfig := EvictionConfig{
+		IdleEvictTime:     this.Config.MinEvictableIdleTimeMillis,
+		IdleSoftEvictTime: this.Config.SoftMinEvictableIdleTimeMillis,
+		MinIdle:           this.Config.MinIdle}
+
+	testWhileIdle := this.Config.TestWhileIdle
+	for i, m := 0, this.getNumTests(); i < m; i++ {
+		if this.evictionIterator == nil || !this.evictionIterator.HasNext() {
+			this.evictionIterator = this.EvictionIterator()
+		}
+		if !this.evictionIterator.HasNext() {
+			// Pool exhausted, nothing to do here
+			return
+		}
+
+		underTest = this.evictionIterator.Next().(*PooledObject)
+		if underTest == nil {
+			// Object was borrowed in another thread
+			// Don't count this as an eviction test so reduce i;
+			i--
+			this.evictionIterator = nil
+			continue
+		}
+
+		if !underTest.StartEvictionTest() {
+			// Object was borrowed in another thread
+			// Don't count this as an eviction test so reduce i;
+			i--
+			continue
+		}
+
+		// User provided eviction policy could throw all sorts of
+		// crazy exceptions. Protect against such an exception
+		// killing the eviction thread.
+
+		evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
+
+		if evict {
+			if debug_pool {
+				fmt.Printf("pool evict %v \n", underTest.Object)
 			}
-			if !this.evictionIterator.HasNext() {
-				// Pool exhausted, nothing to do here
-				return
-			}
-
-			underTest = this.evictionIterator.Next().(*PooledObject)
-			if underTest == nil {
-				// Object was borrowed in another thread
-				// Don't count this as an eviction test so reduce i;
-				i--
-				this.evictionIterator = nil
-				continue
-			}
-
-			if !underTest.StartEvictionTest() {
-				// Object was borrowed in another thread
-				// Don't count this as an eviction test so reduce i;
-				i--
-				continue
-			}
-
-			// User provided eviction policy could throw all sorts of
-			// crazy exceptions. Protect against such an exception
-			// killing the eviction thread.
-
-			evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
-
-			if evict {
-				if debug_pool {
-					fmt.Printf("pool evict %v \n", underTest.Object)
+			this.destroy(underTest)
+			this.destroyedByEvictorCount.IncrementAndGet()
+		} else {
+			var active bool = false
+			if testWhileIdle {
+				err := this.factory.ActivateObject(underTest)
+				if err == nil {
+					active = true
+				} else {
+					this.destroy(underTest)
+					this.destroyedByEvictorCount.IncrementAndGet()
 				}
-				this.destroy(underTest)
-				this.destroyedByEvictorCount.IncrementAndGet()
-			} else {
-				var active bool = false
-				if testWhileIdle {
-					err := this.factory.ActivateObject(underTest)
-					if err == nil {
-						active = true
-					} else {
+				if active {
+					if !this.factory.ValidateObject(underTest) {
 						this.destroy(underTest)
 						this.destroyedByEvictorCount.IncrementAndGet()
-					}
-					if active {
-						if !this.factory.ValidateObject(underTest) {
+					} else {
+						err := this.factory.PassivateObject(underTest)
+						if err != nil {
 							this.destroy(underTest)
 							this.destroyedByEvictorCount.IncrementAndGet()
-						} else {
-							err := this.factory.PassivateObject(underTest)
-							if err != nil {
-								this.destroy(underTest)
-								this.destroyedByEvictorCount.IncrementAndGet()
-							}
 						}
 					}
 				}
-				if !underTest.EndEvictionTest(this.idleObjects) {
-					// TODO - May need to add code here once additional
-					// states are used
-				}
+			}
+			if !underTest.EndEvictionTest(this.idleObjects) {
+				// TODO - May need to add code here once additional
+				// states are used
 			}
 		}
+	}
 
-	}
-	ac := this.AbandonedConfig
-	if ac != nil && ac.RemoveAbandonedOnMaintenance {
-		this.removeAbandoned(ac)
-	}
 }
 
 func (this *ObjectPool) ensureMinIdle() {
