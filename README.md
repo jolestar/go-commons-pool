@@ -59,12 +59,15 @@ Usage
     obj, _ := pool.BorrowObject()
     pool.ReturnObject(obj)
 
-TODO
+
+How to contribute
 -------
-* Add more unit test
-* Add benchmark test
-* Support go document
-* Refactor Java style to Go style
+* Choose one open issue you want to solve, if not create one and describe what you want to change.
+* Fork the repository on GitHub.
+* Write code to solve the issue.
+* Create PR and link to the issue.
+* Make sure test and coverage pass.
+* Wait maintainers to merge.
 
 License
 -------
