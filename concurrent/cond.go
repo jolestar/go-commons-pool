@@ -16,9 +16,7 @@ func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 	return &cond
 }
 
-/**
-return remain wait time, and is interrupt
-*/
+//wait for signal return remain wait time, and is interrupted
 func (this *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
 	this.setHasWaiters(true)
 	ch := this.signal
@@ -27,10 +25,10 @@ func (this *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, 
 	defer this.setHasWaiters(false)
 	defer this.L.Lock()
 
-	begin := time.Now().Nanosecond()
+	begin := time.Now().UnixNano()
 	select {
 	case _, ok := <-ch:
-		end := time.Now().Nanosecond()
+		end := time.Now().UnixNano()
 		remainTimeout := timeout - time.Duration(end-begin)
 		return remainTimeout, !ok
 	case <-time.After(timeout):
@@ -42,13 +40,12 @@ func (this *TimeoutCond) setHasWaiters(value bool) {
 	this.hasWaiters = value
 }
 
+//Queries whether any goroutine are waiting on this condition
 func (this *TimeoutCond) HasWaiters() bool {
 	return this.hasWaiters
 }
 
-/**
-return is interrupt
-*/
+//wait for signal return waiting is interrupted
 func (this *TimeoutCond) Wait() bool {
 	this.setHasWaiters(true)
 	//copy signal in lock, avoid data race with Interrupt
@@ -60,6 +57,7 @@ func (this *TimeoutCond) Wait() bool {
 	return !ok
 }
 
+// Signal wakes one goroutine waiting on c, if there is any.
 func (this *TimeoutCond) Signal() {
 	select {
 	case this.signal <- 1:
