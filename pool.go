@@ -44,7 +44,7 @@ type ObjectPool struct {
 	closed                           bool
 	closeLock                        sync.Mutex
 	evictionLock                     sync.Mutex
-	idleObjects                      *collections.LinkedBlockDeque
+	idleObjects                      *collections.LinkedBlockingDeque
 	allObjects                       *collections.SyncIdentityMap
 	factory                          PooledObjectFactory
 	createCount                      concurrent.AtomicInteger
@@ -196,7 +196,7 @@ func (this *ObjectPool) doDestroy(toDestroy *PooledObject, inLock bool) {
 	} else {
 		toDestroy.Invalidate()
 	}
-	this.idleObjects.Remove(toDestroy)
+	this.idleObjects.RemoveFirstOccurrence(toDestroy)
 	this.allObjects.Remove(toDestroy.Object)
 	this.factory.DestroyObject(toDestroy)
 	this.destroyedCount.IncrementAndGet()
@@ -443,11 +443,11 @@ func (this *ObjectPool) ReturnObject(object interface{}) error {
 //resources (optional operation). Idle objects cleared must be
 //PooledObjectFactory.DestroyObject(PooledObject) .
 func (this *ObjectPool) Clear() {
-	p, ok := this.idleObjects.Poll().(*PooledObject)
+	p, ok := this.idleObjects.PollFirst().(*PooledObject)
 
 	for ok {
 		this.destroy(p)
-		p, ok = this.idleObjects.Poll().(*PooledObject)
+		p, ok = this.idleObjects.PollFirst().(*PooledObject)
 	}
 }
 
