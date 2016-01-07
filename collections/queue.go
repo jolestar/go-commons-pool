@@ -2,14 +2,9 @@ package collections
 
 import (
 	"errors"
-	"fmt"
 	"github.com/jolestar/go-commons-pool/concurrent"
 	"sync"
 	"time"
-)
-
-const (
-	debug_queue = false
 )
 
 type InterruptedErr struct {
@@ -125,9 +120,6 @@ func (this *LinkedBlockingDeque) unlinkFirst() interface{} {
 	// assert lock.isHeldByCurrentThread();
 	f := this.first
 	if f == nil {
-		if debug_queue {
-			fmt.Println("unlinkFirst first is nil")
-		}
 		return nil
 	}
 	n := f.next
@@ -142,9 +134,6 @@ func (this *LinkedBlockingDeque) unlinkFirst() interface{} {
 	}
 	this.count = this.count - 1
 	this.notFull.Signal()
-	if debug_queue {
-		fmt.Println("unlinkFirst", item)
-	}
 	return item
 }
 
@@ -172,9 +161,6 @@ func (this *LinkedBlockingDeque) unlinkLast() interface{} {
 //Unlinks the provided node.
 func (this *LinkedBlockingDeque) unlink(x *Node) {
 	// assert lock.isHeldByCurrentThread();
-	if debug_queue {
-		fmt.Println("unlink")
-	}
 	p := x.prev
 	n := x.next
 	if p == nil {
@@ -436,9 +422,6 @@ func (this *LinkedBlockingDeque) RemoveLastOccurrence(item interface{}) bool {
 
 //Interrupts the goroutine currently waiting to take an object from the pool.
 func (this *LinkedBlockingDeque) InterruptTakeWaiters() {
-	if debug_queue {
-		fmt.Println("InterruptTakeWaiters")
-	}
 	this.notEmpty.Interrupt()
 }
 
