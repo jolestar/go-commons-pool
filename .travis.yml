@@ -14,8 +14,6 @@ install:
 - go get github.com/stretchr/testify
 script:
     #- "$HOME/gopath/bin/goveralls -service=travis-ci"
-#- go test ./...
-#- bash coverage
 - ${GOPATH%%:*}/bin/overalls -project=github.com/jolestar/go-commons-pool -covermode=count -debug
 - ${GOPATH%%:*}/bin/goveralls -coverprofile=overalls.coverprofile -repotoken $COVERALLS_TOKEN
 env:
