@@ -2,16 +2,11 @@ package pool
 
 import (
 	"errors"
-	"fmt"
 	"github.com/jolestar/go-commons-pool/collections"
 	"github.com/jolestar/go-commons-pool/concurrent"
 	"math"
 	"sync"
 	"time"
-)
-
-const (
-	debug_pool = false
 )
 
 type baseErr struct {
@@ -156,9 +151,6 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 }
 
 func (this *ObjectPool) create() *PooledObject {
-	if debug_pool {
-		fmt.Printf("pool create\n")
-	}
 	localMaxTotal := this.Config.MaxTotal
 	newCreateCount := this.createCount.IncrementAndGet()
 	if localMaxTotal > -1 && int(newCreateCount) > localMaxTotal ||
@@ -187,9 +179,6 @@ func (this *ObjectPool) destroy(toDestroy *PooledObject) {
 }
 
 func (this *ObjectPool) doDestroy(toDestroy *PooledObject, inLock bool) {
-	if debug_pool {
-		fmt.Printf("pool destroy %v \n", toDestroy.Object)
-	}
 	//golang has not recursive lock, so ...
 	if inLock {
 		toDestroy.invalidate()
@@ -244,9 +233,6 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 					ok = true
 				}
 			}
-			if debug_pool {
-				fmt.Printf("pool create: %v, borrowMaxWaitMillis: %v, ok:%v,  p:%v \n", create, borrowMaxWaitMillis, ok, p)
-			}
 			if p == nil {
 				if borrowMaxWaitMillis < 0 {
 					obj, err := this.idleObjects.TakeFirst()
@@ -255,12 +241,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 					}
 					p, ok = obj.(*PooledObject)
 				} else {
-					beginWait := currentTimeMillis()
 					obj, err := this.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond)
-					endWait := currentTimeMillis()
-					if debug_pool && obj == nil {
-						fmt.Printf("pool borrowMaxWaitMillis:%v realWait:%v but return nil \n", borrowMaxWaitMillis, (endWait - beginWait))
-					}
 					if err != nil {
 						return nil, err
 					}
@@ -293,18 +274,12 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if p != nil {
 			e := this.factory.ActivateObject(p)
 			if e != nil {
-				if debug_pool {
-					fmt.Printf("pool ActiveObject fail:%v \n", e)
-				}
 				this.destroy(p)
 				p = nil
 				if create {
 					return nil, NewNoSuchElementErr("Unable to activate object")
 				}
 			}
-		}
-		if debug_pool {
-			fmt.Printf("pool ActiveObject end %v \n", p)
 		}
 		if p != nil && (this.Config.TestOnBorrow || create && this.Config.TestOnCreate) {
 			validate := this.factory.ValidateObject(p)
@@ -320,9 +295,6 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	}
 
 	this.updateStatsBorrow(p, currentTimeMillis()-waitTime)
-	if debug_pool {
-		fmt.Printf("pool borrowObject p:%v ,p.Object:%v \n", p, p.Object)
-	}
 	return p.Object, nil
 }
 
@@ -366,9 +338,6 @@ func (this *ObjectPool) IsClosed() bool {
 // Return an instance to the pool. By contract, object
 // must have been obtained using BorrowObject()
 func (this *ObjectPool) ReturnObject(object interface{}) error {
-	if debug_pool {
-		fmt.Printf("pool ReturnObject %v \n", object)
-	}
 	if object == nil {
 		return errors.New("object is nil.")
 	}
@@ -561,10 +530,6 @@ func (this *ObjectPool) getMinIdle() int {
 }
 
 func (this *ObjectPool) evict() {
-	if debug_pool {
-		fmt.Printf("pool evict idle: %v \n", this.idleObjects.Size())
-	}
-
 	defer func() {
 		ac := this.AbandonedConfig
 		if ac != nil && ac.RemoveAbandonedOnMaintenance {
@@ -618,9 +583,6 @@ func (this *ObjectPool) evict() {
 		evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
 
 		if evict {
-			if debug_pool {
-				fmt.Printf("pool evict %v \n", underTest.Object)
-			}
 			this.destroy(underTest)
 			this.destroyedByEvictorCount.IncrementAndGet()
 		} else {

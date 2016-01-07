@@ -184,21 +184,14 @@ func NewDefaultPoolConfig() *ObjectPoolConfig {
 		MaxWaitMillis:                  DEFAULT_MAX_WAIT_MILLIS,
 		MinEvictableIdleTimeMillis:     DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS,
 		SoftMinEvictableIdleTimeMillis: DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS,
-
-		NumTestsPerEvictionRun: DEFAULT_NUM_TESTS_PER_EVICTION_RUN,
-
-		EvictionPolicyName: DEFAULT_EVICTION_POLICY_NAME,
-
-		TestOnCreate: DEFAULT_TEST_ON_CREATE,
-
-		TestOnBorrow: DEFAULT_TEST_ON_BORROW,
-
-		TestOnReturn: DEFAULT_TEST_ON_RETURN,
-
-		TestWhileIdle: DEFAULT_TEST_WHILE_IDLE,
-
-		TimeBetweenEvictionRunsMillis: DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS,
-		BlockWhenExhausted:            DEFAULT_BLOCK_WHEN_EXHAUSTED}
+		NumTestsPerEvictionRun:         DEFAULT_NUM_TESTS_PER_EVICTION_RUN,
+		EvictionPolicyName:             DEFAULT_EVICTION_POLICY_NAME,
+		TestOnCreate:                   DEFAULT_TEST_ON_CREATE,
+		TestOnBorrow:                   DEFAULT_TEST_ON_BORROW,
+		TestOnReturn:                   DEFAULT_TEST_ON_RETURN,
+		TestWhileIdle:                  DEFAULT_TEST_WHILE_IDLE,
+		TimeBetweenEvictionRunsMillis:  DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS,
+		BlockWhenExhausted:             DEFAULT_BLOCK_WHEN_EXHAUSTED}
 }
 
 type AbandonedConfig struct {
@@ -248,9 +241,6 @@ func RegistryEvictionPolicy(name string, policy EvictionPolicy) {
 }
 
 func GetEvictionPolicy(name string) EvictionPolicy {
-	if name == "" {
-		return nil
-	}
 	policiesMutex.Lock()
 	defer policiesMutex.Unlock()
 	return policies[name]
