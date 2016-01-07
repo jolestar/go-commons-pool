@@ -12,7 +12,7 @@ before_install:
 install:
 - go get github.com/stretchr/testify
 script:
-- "$HOME/gopath/bin/goveralls -service=travis-ci"
+    #- "$HOME/gopath/bin/goveralls -service=travis-ci"
 - go test ./...
 - bash coverage
 - ${GOPATH%%:*}/bin/goveralls -coverprofile=gover.coverprofile -repotoken $COVERALLS_TOKEN
