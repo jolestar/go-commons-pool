@@ -6,13 +6,16 @@ go:
 - tip
 before_install:
 - go get github.com/axw/gocov/gocov
+- go get github.com/go-playground/overalls
 - go get github.com/mattn/goveralls
 - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover;
   fi
 install:
 - go get github.com/stretchr/testify
 script:
-- "$HOME/gopath/bin/goveralls -service=travis-ci"
+    #- "$HOME/gopath/bin/goveralls -service=travis-ci"
+- ${GOPATH%%:*}/bin/overalls -project=github.com/jolestar/go-commons-pool -covermode=count -debug
+- ${GOPATH%%:*}/bin/goveralls -coverprofile=overalls.coverprofile -repotoken $COVERALLS_TOKEN
 env:
   global:
     secure: ls4MmUJQPUA91M7XLk/nAMhxhfg00XKqgnZ4e/UePQqm6W29dxgsrmFx1PPuZd52Q8K04d0LsL3fnU3/X0GBTklcYjcgjBi4z7cOSwirGHC634tfirwbNujWc2rSzvqHeszl+7BuRrTodYhwqPABju5HIv9z+q87IZWvYCsV2OQ8OX/pHYL7H0dwGyma0gwN5KAySfPZ5Zl51eY5BuBsEcHsuxiwMvNRagQIkWvrM2yIO9oLzHEEcrdZGyVSJHKch4t9nnsueU/k0yzgYPPLmjzQaPHlQkOCEMg0g1S5vEGVBmEKNxqccNHk6dzgaEkAfvm8xf+KsZ2IMMJuOsIXkxhOkcbMF4Wqz9UaKYRYZkVNPcL4ZzbCi8nibvXubmGQHw/yTxq+JP2s8Iw89pzKkzkuMV3MBwQ+ZpX55iQGgMLBZbDHB99ZcujyextWgxD7Y6bNrkMgWcnEk4OotP4fXb6+pQbOlKq5xOIiEnPoPwq6kUnAph0sMYmI7mqKaL6Llp6q2RHqhJtoNAreSHg/KcVYoAJaeQtEKx/KeRSH00BLpNdX1JvXW8R2B3uTgUb3yYxvmR4FcTfWmNsEMfhJhQersBEI5bS+iPVcIVOdTKjTBuasrwyr0ikNOvDSgunRBs4cwBVrVCLgZC3n72aPc61X/J/tlQM47QqiasImrdo=

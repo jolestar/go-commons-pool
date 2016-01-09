@@ -183,7 +183,7 @@ func (this *PooledObject) StartEvictionTest() bool {
 	return false
 }
 
-func (this *PooledObject) EndEvictionTest(idleQueue *collections.LinkedBlockDeque) bool {
+func (this *PooledObject) EndEvictionTest(idleQueue *collections.LinkedBlockingDeque) bool {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if this.state == EVICTION {
