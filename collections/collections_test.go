@@ -31,6 +31,19 @@ func TestSyncMapString(t *testing.T) {
 	assert.Nil(t, m.Get(&key))
 }
 
+func TestSyncMapValues(t *testing.T) {
+	m := NewSyncMap()
+	key := "key"
+	key2 := "key2"
+	m.Put(&key, "value1")
+	m.Put(&key2, "value2")
+	values := m.Values()
+	assert.Equal(t, 2, len(values))
+	assert.Equal(t, "value1", values[0])
+	assert.Equal(t, "value2", values[1])
+
+}
+
 func TestSyncMapHashableObject(t *testing.T) {
 	m := NewSyncMap()
 	o1 := HashableObject{}

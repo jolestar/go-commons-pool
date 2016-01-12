@@ -58,9 +58,11 @@ func (this *SyncIdentityMap) Size() int {
 func (this *SyncIdentityMap) Values() []interface{} {
 	this.RLock()
 	defer this.RUnlock()
-	var list []interface{}
+	list := make([]interface{}, len(this.m))
+	i := 0
 	for _, v := range this.m {
-		list = append(list, v)
+		list[i] = v
+		i++
 	}
 	return list
 }
