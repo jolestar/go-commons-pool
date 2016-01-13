@@ -18,7 +18,9 @@ func TestDefaultPooledObjectFactorySimple(t *testing.T) {
 
 	assert.NotNil(t, factory)
 	o, _ := factory.MakeObject()
-	fmt.Println("object:", o.Object)
+	if debug_test {
+		fmt.Println("object:", o.Object)
+	}
 	assert.NotNil(t, o)
 	assert.Nil(t, factory.ActivateObject(o))
 	assert.Nil(t, factory.PassivateObject(o))
@@ -50,7 +52,6 @@ func TestDefaultPooledObjectFactory(t *testing.T) {
 
 	assert.NotNil(t, factory)
 	o, _ := factory.MakeObject()
-	fmt.Println("object:", o.Object)
 	assert.NotNil(t, o)
 	obj := o.Object.(*TestFactoryObject)
 	assert.Equal(t, "make", obj.status)

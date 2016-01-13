@@ -60,6 +60,12 @@ Usage
     pool.ReturnObject(obj)
 
 
+PerformanceTest
+-------
+The results of running the pool_perf_test is almost equal to the java version [PerformanceTest](https://github.com/apache/commons-pool/blob/trunk/src/test/java/org/apache/commons/pool2/performance/PerformanceTest.java)
+    
+    go test --perf=true
+
 How to contribute
 -------
 * Choose one open issue you want to solve, if not create one and describe what you want to change.
