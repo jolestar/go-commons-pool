@@ -2,6 +2,7 @@ package pool
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"github.com/jolestar/go-commons-pool/collections"
 	"github.com/jolestar/go-commons-pool/concurrent"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"math"
 	"math/rand"
+	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -19,8 +21,8 @@ type TestObject struct {
 	Num int
 }
 
-const (
-	debug_simple_facotry = false
+var (
+	debug_test = false
 )
 
 type SimpleFactory struct {
@@ -63,7 +65,7 @@ func (this *SimpleFactory) doWait(latencyMillisecond int64) {
 }
 
 func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
-	if debug_simple_facotry {
+	if debug_test {
 		fmt.Println("factory MakeObject")
 	}
 	var waitLatency int64
@@ -86,7 +88,7 @@ func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
 }
 
 func (this *SimpleFactory) DestroyObject(object *PooledObject) error {
-	if debug_simple_facotry {
+	if debug_test {
 		fmt.Println("factory DestroyObject")
 	}
 	var waitLatency int64
@@ -108,7 +110,7 @@ func (this *SimpleFactory) DestroyObject(object *PooledObject) error {
 }
 
 func (this *SimpleFactory) ValidateObject(object *PooledObject) bool {
-	if debug_simple_facotry {
+	if debug_test {
 		fmt.Println("factory ValidateObject")
 	}
 	var validate bool
@@ -138,7 +140,7 @@ func (this *SimpleFactory) ValidateObject(object *PooledObject) bool {
 }
 
 func (this *SimpleFactory) ActivateObject(object *PooledObject) error {
-	if debug_simple_facotry {
+	if debug_test {
 		fmt.Println("factory ActivateObject")
 		defer fmt.Println("factory ActivateObject end")
 	}
@@ -168,7 +170,7 @@ func (this *SimpleFactory) ActivateObject(object *PooledObject) error {
 }
 
 func (this *SimpleFactory) PassivateObject(object *PooledObject) error {
-	if debug_simple_facotry {
+	if debug_test {
 		fmt.Println("factory PassivateObject")
 	}
 	var hurl bool
@@ -254,13 +256,16 @@ func (this *PoolTestSuite) TestBaseAddObject() {
 	this.pool.Config.MaxTotal = 3
 	this.assertEquals(0, this.pool.GetNumIdle())
 	this.assertEquals(0, this.pool.GetNumActive())
-	fmt.Println("test AddObject")
+	if debug_test {
+		fmt.Println("test AddObject")
+	}
 	this.pool.AddObject()
 
 	this.assertEquals(1, this.pool.GetNumIdle())
 	this.assertEquals(0, this.pool.GetNumActive())
-
-	fmt.Println("test BorrowObject")
+	if debug_test {
+		fmt.Println("test BorrowObject")
+	}
 	obj, err := this.pool.BorrowObject()
 	if err != nil {
 		this.Fail(err.Error())
@@ -488,7 +493,9 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 
 	borrowTime := <-ch
 	close(ch)
-	fmt.Println("TestWhenExhaustedBlockInterrupt borrowTime:", borrowTime)
+	if debug_test {
+		fmt.Println("TestWhenExhaustedBlockInterrupt borrowTime:", borrowTime)
+	}
 	this.True(borrowTime >= 200)
 
 	// Check thread was interrupted
@@ -572,7 +579,9 @@ func threadRun(arg *TestThreadArg) chan TestThreadResult {
 			obj, err := arg.pool.BorrowObject()
 			endBorrow := currentTimeMillis()
 			if err != nil {
-				fmt.Println("borrow error, time:", endBorrow-startBorrow)
+				if debug_test {
+					fmt.Println("borrow error, time:", endBorrow-startBorrow)
+				}
 				result.error = err
 				result.failed = true
 				result.complete = true
@@ -617,7 +626,9 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	ch := threadRun(borrower)
 	result := <-ch
 	close(ch)
-	fmt.Printf("TestEvictAddObjects %v error:%v", borrower, result.error)
+	if debug_test {
+		fmt.Printf("TestEvictAddObjects %v error:%v", borrower, result.error)
+	}
 	this.True(!result.failed)
 }
 
@@ -639,26 +650,34 @@ func (this *PoolTestSuite) checkEvict(lifo bool) {
 	Prefill(this.pool, 5)
 	this.pool.evict()
 	idle = this.pool.GetNumIdle()
-	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	if debug_test {
+		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	}
 	this.factory.evenValid = false
 	this.factory.oddValid = false
 	this.factory.exceptionOnActivate = true
 	this.pool.evict()
 	idle = this.pool.GetNumIdle()
-	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	if debug_test {
+		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	}
 	Prefill(this.pool, 5)
 	this.factory.exceptionOnActivate = false
 	this.factory.exceptionOnPassivate = true
 	this.pool.evict()
 	idle = this.pool.GetNumIdle()
-	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	if debug_test {
+		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	}
 	this.factory.exceptionOnPassivate = false
 	this.factory.evenValid = true
 	this.factory.oddValid = true
 	time.Sleep(time.Duration(125) * time.Millisecond)
 	this.pool.evict()
 	idle = this.pool.GetNumIdle()
-	fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	if debug_test {
+		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
+	}
 	this.assertEquals(2, this.pool.GetNumIdle())
 }
 
@@ -800,7 +819,9 @@ func (this *PoolTestSuite) TestMaxIdle() {
 	this.assertEquals(0, this.pool.GetNumIdle())
 	for i := 0; i < 100; i++ {
 		obj := active[i]
-		fmt.Printf("TestMaxIdle ReturnObject %v \n", obj)
+		if debug_test {
+			fmt.Printf("TestMaxIdle ReturnObject %v \n", obj)
+		}
 		err := this.pool.ReturnObject(obj)
 		this.NoError(err)
 		this.assertEquals(99-i, this.pool.GetNumActive())
@@ -1122,7 +1143,9 @@ func (this *PoolTestSuite) TestEvictionInvalid() {
 		func() (interface{}, error) {
 			return &TestObject{}, nil
 		}, nil, func(object *PooledObject) bool {
-			//fmt.Printf("TestEvictionInvalid valid object %v \n", object)
+			if debug_test {
+				fmt.Printf("TestEvictionInvalid valid object %v \n", object)
+			}
 			time.Sleep(time.Duration(1000) * time.Millisecond)
 			return false
 		}, nil, nil))
@@ -1140,7 +1163,9 @@ func (this *PoolTestSuite) TestEvictionInvalid() {
 
 	// Run eviction in a separate thread
 	go func() {
-		fmt.Println("TestEvictionInvalid evict thread.")
+		if debug_test {
+			fmt.Println("TestEvictionInvalid evict thread.")
+		}
 		this.pool.evict()
 	}()
 
@@ -1191,7 +1216,9 @@ func (this *PoolTestSuite) TestConcurrentInvalidate() {
 				_, ok := err.(*IllegalStatusErr)
 				if err != nil && !ok {
 					results <- false
-					fmt.Printf("TestConcurrentInvalidate InvalidateObject error:%v, obj: %v \n", err, obj)
+					if debug_test {
+						fmt.Printf("TestConcurrentInvalidate InvalidateObject error:%v, obj: %v \n", err, obj)
+					}
 				} else {
 					results <- true
 				}
@@ -1302,7 +1329,9 @@ func runTestThreads(t *testing.T, numThreads int, iterations int, delay int, tes
 	}
 	if len(failedThreads) > 0 {
 		for _, t := range failedThreads {
-			fmt.Printf("Thread %v failed %v \n", t, results[t].error)
+			if debug_test {
+				fmt.Printf("Thread %v failed %v \n", t, results[t].error)
+			}
 		}
 		assert.Fail(t, fmt.Sprintf("Thread %v failed", failedThreads))
 	}
@@ -1505,8 +1534,6 @@ func (this *PoolTestSuite) TestBrokenFactoryShouldNotBlockPool() {
 	this.NoError(this.pool.ReturnObject(obj))
 }
 
-var DISPLAY_THREAD_DETAILS = true
-
 /*
  * Test multi-threaded pool access.
  * Multiple threads, but maxTotal only allows half the threads to succeed.
@@ -1539,7 +1566,7 @@ func (this *PoolTestSuite) TestMaxWaitMultiThreaded() {
 			failed++
 		}
 	}
-	if DISPLAY_THREAD_DETAILS || len(resultChans)/2 != failed {
+	if debug_test || len(resultChans)/2 != failed {
 		fmt.Println(
 			"MaxWait: ", maxWait,
 			" HoldTime: ", holdTime,
@@ -1737,3 +1764,21 @@ func (this *PoolTestSuite) TestMutable() {
 //TODO
 //func (this *PoolTestSuite) TestMultipleReturn() {
 //}
+
+var perf bool
+
+func init() {
+	flag.BoolVar(&perf, "perf", false, "perf")
+	flag.BoolVar(&debug_test, "debug_test", false, "debug_test")
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	exit := 0
+	if perf {
+		perf_main()
+	} else {
+		exit = m.Run()
+	}
+	os.Exit(exit)
+}

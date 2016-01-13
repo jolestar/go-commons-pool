@@ -8,7 +8,9 @@ import (
 
 func TestPoolConfig(t *testing.T) {
 	config := NewDefaultPoolConfig()
-	fmt.Println(config)
+	if debug_test {
+		fmt.Println(config)
+	}
 	assert.NotNil(t, config)
 }
 
