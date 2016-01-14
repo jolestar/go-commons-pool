@@ -51,18 +51,23 @@ type ObjectPool struct {
 }
 
 func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
+	return NewObjectPoolWithAbandonedConfig(factory, config, nil)
+}
+
+func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
+	return NewObjectPool(factory, NewDefaultPoolConfig())
+}
+
+func NewObjectPoolWithAbandonedConfig(factory PooledObjectFactory, config *ObjectPoolConfig, abandonedConfig *AbandonedConfig) *ObjectPool {
 	pool := ObjectPool{factory: factory, Config: config,
 		idleObjects:             collections.NewDeque(math.MaxInt32),
 		allObjects:              collections.NewSyncMap(),
 		createCount:             concurrent.AtomicInteger(0),
 		destroyedByEvictorCount: concurrent.AtomicInteger(0),
-		destroyedCount:          concurrent.AtomicInteger(0)}
+		destroyedCount:          concurrent.AtomicInteger(0),
+		AbandonedConfig:         abandonedConfig}
 	pool.StartEvictor()
 	return &pool
-}
-
-func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
-	return NewObjectPool(factory, NewDefaultPoolConfig())
 }
 
 // Create an object using the PooledObjectFactory factory, passivate it, and then place it in
@@ -75,7 +80,11 @@ func (this *ObjectPool) AddObject() error {
 	if this.factory == nil {
 		return NewIllegalStatusErr("Cannot add objects without a factory.")
 	}
-	this.addIdleObject(this.create())
+	p, e := this.create()
+	if e != nil {
+		return e
+	}
+	this.addIdleObject(p)
 	return nil
 }
 
@@ -128,10 +137,10 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 	// Generate a list of abandoned objects to remove
 	now := currentTimeMillis()
 	timeout := now - int64((config.RemoveAbandonedTimeout * 1000))
-	var remove []PooledObject
+	var remove []*PooledObject
 	objects := this.allObjects.Values()
 	for _, o := range objects {
-		pooledObject := o.(PooledObject)
+		pooledObject := o.(*PooledObject)
 		pooledObject.lock.Lock()
 		if pooledObject.state == ALLOCATED &&
 			pooledObject.GetLastUsedTime() <= timeout {
@@ -150,20 +159,19 @@ func (this *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 	}
 }
 
-func (this *ObjectPool) create() *PooledObject {
+func (this *ObjectPool) create() (*PooledObject, error) {
 	localMaxTotal := this.Config.MaxTotal
 	newCreateCount := this.createCount.IncrementAndGet()
 	if localMaxTotal > -1 && int(newCreateCount) > localMaxTotal ||
 		newCreateCount >= math.MaxInt32 {
 		this.createCount.DecrementAndGet()
-		return nil
+		return nil, nil
 	}
 
 	p, e := this.factory.MakeObject()
 	if e != nil {
 		this.createCount.DecrementAndGet()
-		//return error ?
-		return nil
+		return nil, e
 	}
 
 	//	ac := this.abandonedConfig;
@@ -171,7 +179,7 @@ func (this *ObjectPool) create() *PooledObject {
 	//		p.setLogAbandoned(true);
 	//	}
 	this.allObjects.Put(p.Object, p)
-	return p
+	return p, nil
 }
 
 func (this *ObjectPool) destroy(toDestroy *PooledObject) {
@@ -214,7 +222,7 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	}
 
 	var p *PooledObject
-
+	var e error
 	// Get local copy of current config so it is consistent for entire
 	// method execution
 	blockWhenExhausted := this.Config.BlockWhenExhausted
@@ -227,7 +235,10 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if blockWhenExhausted {
 			p, ok = this.idleObjects.PollFirst().(*PooledObject)
 			if !ok {
-				p = this.create()
+				p, e = this.create()
+				if e != nil {
+					return nil, e
+				}
 				if p != nil {
 					create = true
 					ok = true
@@ -258,7 +269,10 @@ func (this *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		} else {
 			p, ok = this.idleObjects.PollFirst().(*PooledObject)
 			if !ok {
-				p = this.create()
+				p, e = this.create()
+				if e != nil {
+					return nil, e
+				}
 				if p != nil {
 					create = true
 				}
@@ -308,7 +322,8 @@ func (this *ObjectPool) ensureIdle(idleCount int, always bool) {
 	}
 
 	for this.idleObjects.Size() < idleCount {
-		p := this.create()
+		//just ignore create error
+		p, _ := this.create()
 		if p == nil {
 			// Can't create objects, no reason to think another call to
 			// create will work. Give up.
@@ -621,7 +636,9 @@ func (this *ObjectPool) ensureMinIdle() {
 	this.ensureIdle(this.getMinIdle(), true)
 }
 
-func (this *ObjectPool) preparePool() {
+//Tries to ensure that {@link #getMinIdle()} idle instances are available
+//in the pool.
+func (this *ObjectPool) PreparePool() {
 	if this.getMinIdle() < 1 {
 		return
 	}

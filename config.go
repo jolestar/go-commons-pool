@@ -201,6 +201,10 @@ type AbandonedConfig struct {
 	RemoveAbandonedTimeout int
 }
 
+func NewDefaultAbandonedConfig() *AbandonedConfig {
+	return &AbandonedConfig{RemoveAbandonedOnBorrow: false, RemoveAbandonedOnMaintenance: false, 300}
+}
+
 type EvictionConfig struct {
 	IdleEvictTime     int64
 	IdleSoftEvictTime int64

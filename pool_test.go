@@ -35,6 +35,7 @@ type SimpleFactory struct {
 	exceptionOnPassivate bool
 	exceptionOnActivate  bool
 	exceptionOnDestroy   bool
+	exceptionOnMake      bool
 	enableValidation     bool
 	destroyLatency       int64
 	makeLatency          int64
@@ -67,6 +68,9 @@ func (this *SimpleFactory) doWait(latencyMillisecond int64) {
 func (this *SimpleFactory) MakeObject() (*PooledObject, error) {
 	if debug_test {
 		fmt.Println("factory MakeObject")
+	}
+	if this.exceptionOnMake {
+		return nil, errors.New("make object error")
 	}
 	var waitLatency int64
 	this.lock.Lock()
@@ -1764,6 +1768,45 @@ func (this *PoolTestSuite) TestMutable() {
 //TODO
 //func (this *PoolTestSuite) TestMultipleReturn() {
 //}
+
+func (this *PoolTestSuite) TestAddError() {
+	this.pool.factory = nil
+	err := this.pool.AddObject()
+	this.NotNil(err)
+	this.NotNil(err.Error())
+}
+
+func (this *PoolTestSuite) TestClosePoolError() {
+	this.pool.Close()
+	err := this.pool.AddObject()
+	this.NotNil(err)
+}
+
+func (this *PoolTestSuite) TestMakeObjectError() {
+	this.factory.exceptionOnMake = true
+	err := this.pool.AddObject()
+	this.NotNil(err)
+}
+
+func (this *PoolTestSuite) TestReturnObjectError() {
+	obj := new(TestObject)
+	err := this.pool.ReturnObject(obj)
+	this.NotNil(err)
+}
+
+func (this *PoolTestSuite) TestPreparePool() {
+	this.pool.Config.MinIdle = 1
+	this.pool.Config.MaxTotal = 1
+	this.pool.PreparePool()
+	this.Equal(1, this.pool.GetNumIdle())
+	obj := this.NoErrorWithResult(this.pool.BorrowObject())
+	this.pool.PreparePool()
+	this.Equal(0, this.pool.GetNumIdle())
+	this.pool.Config.MinIdle = 0
+	this.NoError(this.pool.ReturnObject(obj))
+	this.pool.PreparePool()
+	this.Equal(1, this.pool.GetNumIdle())
+}
 
 var perf bool
 
