@@ -23,9 +23,7 @@ const (
 )
 
 type TrackedUse interface {
-	/**
-	Get the last time this object was used in ms.
-	*/
+	//Get the last time this object was used in ms.
 	GetLastUsed() int64
 }
 
@@ -140,16 +138,10 @@ func (this *PooledObject) invalidate() {
 	this.state = INVALID
 }
 
-func (this *PooledObject) Use() {
-	this.LastUseTime = currentTimeMillis()
-	//usedBy = new Exception("The last code to use this object was:");
-}
-
 func (this *PooledObject) GetState() PooledObjectState {
 	this.lock.Lock()
-	result := this.state
-	this.lock.Unlock()
-	return result
+	defer this.lock.Unlock()
+	return this.state
 }
 
 func (this *PooledObject) MarkAbandoned() {
