@@ -125,7 +125,6 @@ func TestPoolAbandonedTestSuite(t *testing.T) {
 }
 
 func (this *PoolAbandonedTestSuite) SetupTest() {
-	fmt.Println("PoolAbandonedTestSuite SetupTest")
 	abandonedConfig := NewDefaultAbandonedConfig()
 
 	// -- Uncomment the following line to enable logging --
@@ -169,7 +168,6 @@ func concurrentReturner(pool *ObjectPool, object *AbandonedTestObject, wait *syn
  * in GenericObjectPool
  */
 func (this *PoolAbandonedTestSuite) TestConcurrentInvalidation() {
-	fmt.Println("PoolAbandonedTestSuite TestConcurrentInvalidation")
 	POOL_SIZE := 30
 	this.pool.Config.MaxTotal = POOL_SIZE
 	this.pool.Config.MaxIdle = POOL_SIZE
@@ -239,7 +237,9 @@ func (this *PoolAbandonedTestSuite) TestAbandonedReturn() {
 	wait := new(sync.WaitGroup)
 	wait.Add(1)
 	deadMansHash := obj.hashCode()
-	fmt.Println("deadMansHash:", deadMansHash)
+	if debug_test {
+		fmt.Println("deadMansHash:", deadMansHash)
+	}
 	concurrentReturner(this.pool, obj, wait)
 	sleep(2000) // abandon checked out instances
 	// Now start a race - returner waits until borrowObject has kicked

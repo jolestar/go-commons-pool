@@ -202,7 +202,7 @@ type AbandonedConfig struct {
 }
 
 func NewDefaultAbandonedConfig() *AbandonedConfig {
-	return &AbandonedConfig{RemoveAbandonedOnBorrow: false, RemoveAbandonedOnMaintenance: false, 300}
+	return &AbandonedConfig{RemoveAbandonedOnBorrow: false, RemoveAbandonedOnMaintenance: false, RemoveAbandonedTimeout: 300}
 }
 
 type EvictionConfig struct {
