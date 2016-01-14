@@ -80,11 +80,7 @@ func NewPooledObjectFactory(
 }
 
 func (this *DefaultPooledObjectFactory) MakeObject() (*PooledObject, error) {
-	if this.make != nil {
-		return this.make()
-	} else {
-		return nil, errors.New("object factory in illegal status")
-	}
+	return this.make()
 }
 
 func (this *DefaultPooledObjectFactory) DestroyObject(object *PooledObject) error {

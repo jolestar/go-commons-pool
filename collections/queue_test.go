@@ -101,6 +101,7 @@ func (this *LinkedBlockDequeTestSuite) TestPutLastWait() {
 		this.deque.PutLast(THREE)
 		wait.Done()
 	}()
+	sleep(100)
 	this.Equal(TWO, this.deque.PollLast())
 	wait.Wait()
 	this.Equal(2, this.deque.Size())
@@ -116,6 +117,7 @@ func (this *LinkedBlockDequeTestSuite) TestPutFirstWait() {
 		this.deque.PutFirst(THREE)
 		wait.Done()
 	}()
+	sleep(100)
 	this.Equal(TWO, this.deque.PollFirst())
 	wait.Wait()
 	this.Equal(2, this.deque.Size())
@@ -232,6 +234,7 @@ func (this *LinkedBlockDequeTestSuite) TestInterrupt() {
 		_, e := this.deque.TakeFirst()
 		_, ok := e.(*InterruptedErr)
 		this.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
+		this.NotNil(e.Error())
 	}
 	wait.Wait()
 }

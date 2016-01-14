@@ -3,6 +3,7 @@ package pool
 import (
 	"fmt"
 	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"sync"
 	"testing"
@@ -37,6 +38,12 @@ func (this *AbandonedTestObject) destroy() {
 
 func (this *AbandonedTestObject) hashCode() int {
 	return this._hash
+}
+
+func TestAbandonedTestObject(t *testing.T) {
+	obj := NewAbandonedTestObject()
+	var trackedUse TrackedUse = obj
+	assert.Equal(t, int64(0), trackedUse.GetLastUsed())
 }
 
 type SimpleAbandonedFactory struct {
