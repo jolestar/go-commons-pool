@@ -146,6 +146,12 @@ How to contribute
 * Make sure test and coverage pass.
 * Wait maintainers to merge.
 
+中文文档
+-------
+* [Go Commons Pool发布以及Golang多线程编程问题总结](http://jolestar.com/go-commons-pool-and-go-concurrent/)
+* [Go Commons Pool 1.0 发布](http://jolestar.com/go-commons-pool-v1-release/)
+
+
 License
 -------
 
