@@ -39,9 +39,6 @@ func TestSyncMapValues(t *testing.T) {
 	m.Put(&key2, "value2")
 	values := m.Values()
 	assert.Equal(t, 2, len(values))
-	assert.Equal(t, "value1", values[0])
-	assert.Equal(t, "value2", values[1])
-
 }
 
 func TestSyncMapHashableObject(t *testing.T) {
