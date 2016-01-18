@@ -20,10 +20,6 @@ Features
 	* Pool object eviction config
 	* Pool object abandon config
 
-Dependency
--------
-* [testify](https://github.com/stretchr/testify) for test
-
 Pool Configuration Option
 -------
 
@@ -118,6 +114,9 @@ The right way is:
 
 more example please see example_test.go
 
+Dependency
+-------
+* [testify](https://github.com/stretchr/testify) for test
 
 PerformanceTest
 -------
