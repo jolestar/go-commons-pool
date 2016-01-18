@@ -1,6 +1,10 @@
 package pool
 
-import "testing"
+import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 type MyPoolObject struct {
 }
@@ -44,6 +48,19 @@ func (this *MyObjectFactory) PassivateObject(object *PooledObject) error {
 func TestCustomFactoryExample(t *testing.T) {
 	pool := NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
 	obj, _ := pool.BorrowObject()
+	pool.ReturnObject(obj)
+}
+
+func TestStringExample(t *testing.T) {
+	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+		func() (interface{}, error) {
+			var stringPointer = new(string)
+			*stringPointer = "hello"
+			return stringPointer, nil
+		}))
+	obj, _ := pool.BorrowObject()
+	fmt.Println(obj)
+	assert.Equal(t, "hello", *obj.(*string))
 	pool.ReturnObject(obj)
 }
 
