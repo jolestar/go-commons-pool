@@ -425,7 +425,7 @@ func (this *LinkedBlockingDeque) InterruptTakeWaiters() {
 	this.notEmpty.Interrupt()
 }
 
-//Returns true if there are threads waiting to take instances from this deque.
+//Returns true if there are goroutine waiting to take instances from this deque.
 //See disclaimer on accuracy in  TimeoutCond.HasWaiters()
 func (this *LinkedBlockingDeque) HasTakeWaiters() bool {
 	this.lock.Lock()

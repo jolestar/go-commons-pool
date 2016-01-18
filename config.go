@@ -48,7 +48,7 @@ type ObjectPoolConfig struct {
 	 * If MaxIdle
 	 * is set too low on heavily loaded systems it is possible you will see
 	 * objects being destroyed and almost immediately new objects being created.
-	 * This is a result of the active threads momentarily returning objects
+	 * This is a result of the active goroutines momentarily returning objects
 	 * faster than they are requesting them them, causing the number of idle
 	 * objects to rise above maxIdle. The best value for maxIdle for heavily
 	 * loaded system will vary but the default is a good starting point.
@@ -70,17 +70,17 @@ type ObjectPoolConfig struct {
 
 	/**
 	* Whether objects created for the pool will be validated before
-	* being returned from the <code>ObjectPool.BorrowObject()</code> method. Validation is
-	* performed by the <code>ValidateObject()</code> method of the factory
+	* being returned from the ObjectPool.BorrowObject() method. Validation is
+	* performed by the ValidateObject() method of the factory
 	* associated with the pool. If the object fails to validate, then
-	* <code>ObjectPool.BorrowObject()</code> will fail.
+	* ObjectPool.BorrowObject() will fail.
 	 */
 	TestOnCreate bool
 
 	/**
 	 * Whether objects borrowed from the pool will be validated before
-	 * being returned from the <code>ObjectPool.BorrowObject()</code> method. Validation is
-	 * performed by the <code>ValidateObject()</code> method of the factory
+	 * being returned from the ObjectPool.BorrowObject() method. Validation is
+	 * performed by the ValidateObject() method of the factory
 	 * associated with the pool. If the object fails to validate, it will be
 	 * removed from the pool and destroyed, and a new attempt will be made to
 	 * borrow an object from the pool.
@@ -89,8 +89,8 @@ type ObjectPoolConfig struct {
 
 	/**
 	 * Whether objects borrowed from the pool will be validated when
-	 * they are returned to the pool via the <code>ObjectPool.ReturnObject()</code> method.
-	 * Validation is performed by the <code>ValidateObject()</code> method of
+	 * they are returned to the pool via the ObjectPool.ReturnObject() method.
+	 * Validation is performed by the ValidateObject() method of
 	 * the factory associated with the pool. Returning objects that fail validation
 	 * are destroyed rather then being returned the pool.
 	 */
@@ -100,7 +100,7 @@ type ObjectPoolConfig struct {
 	* Whether objects sitting idle in the pool will be validated by the
 	* idle object evictor (if any - see
 	*  TimeBetweenEvictionRunsMillis ). Validation is performed
-	* by the <code>ValidateObject()</code> method of the factory associated
+	* by the ValidateObject() method of the factory associated
 	* with the pool. If the object fails to validate, it will be removed from
 	* the pool and destroyed.  Note that setting this property has no effect
 	* unless the idle object evictor is enabled by setting
@@ -109,7 +109,7 @@ type ObjectPoolConfig struct {
 	TestWhileIdle bool
 
 	/**
-	* Whether to block when the <code>ObjectPool.BorrowObject()</code> method is
+	* Whether to block when the ObjectPool.BorrowObject() method is
 	* invoked when the pool is exhausted (the maximum number of "active"
 	* objects has been reached).
 	 */
@@ -120,10 +120,10 @@ type ObjectPoolConfig struct {
 
 	/**
 	 * The maximum amount of time (in milliseconds) the
-	 * <code>ObjectPool.BorrowObject()</code> method should block before return
+	 * ObjectPool.BorrowObject() method should block before return
 	 * a error when the pool is exhausted and
 	 *  BlockWhenExhausted is true. When less than 0, the
-	 * <code>ObjectPool.BorrowObject()</code> method may block indefinitely.
+	 * ObjectPool.BorrowObject() method may block indefinitely.
 	 *
 	 */
 	MaxWaitMillis int64
@@ -140,7 +140,7 @@ type ObjectPoolConfig struct {
 	 * The minimum amount of time an object may sit idle in the pool
 	 * before it is eligible for eviction by the idle object evictor (if any -
 	 * see TimeBetweenEvictionRunsMillis ),
-	 * with the extra condition that at least <code>MinIdle</code> object
+	 * with the extra condition that at least MinIdle object
 	 * instances remain in the pool. This setting is overridden by
 	 *  MinEvictableIdleTimeMillis (that is, if
 	 *  MinEvictableIdleTimeMillis is positive, then
@@ -150,25 +150,25 @@ type ObjectPoolConfig struct {
 
 	/**
 	 * The maximum number of objects to examine during each run (if any)
-	 * of the idle object evictor thread. When positive, the number of tests
+	 * of the idle object evictor goroutine. When positive, the number of tests
 	 * performed for a run will be the minimum of the configured value and the
 	 * number of idle instances in the pool. When negative, the number of tests
-	 * performed will be <code>math.Ceil(ObjectPool.GetNumIdle()/math.
-	 * Abs(PoolConfig.NumTestsPerEvictionRun))</code> which means that when the
-	 * value is <code>-n</code> roughly one nth of the idle objects will be
+	 * performed will be math.Ceil(ObjectPool.GetNumIdle()/math.
+	 * Abs(PoolConfig.NumTestsPerEvictionRun)) which means that when the
+	 * value is -n roughly one nth of the idle objects will be
 	 * tested per run.
 	 */
 	NumTestsPerEvictionRun int
 
 	/**
 	 * The name of the EvictionPolicy implementation that is
-	 * used by this pool. Please register policy by <code>RegistryEvictionPolicy(name, policy)</code>
+	 * used by this pool. Please register policy by RegistryEvictionPolicy(name, policy)
 	 */
 	EvictionPolicyName string
 
 	/**
 	* The number of milliseconds to sleep between runs of the idle
-	* object evictor thread. When non-positive, no idle object evictor thread
+	* object evictor goroutine. When non-positive, no idle object evictor goroutine
 	* will be run.
 	* if this value changed after ObjectPool created, should call ObjectPool.StartEvictor to take effect.
 	 */

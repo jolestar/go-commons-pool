@@ -483,8 +483,8 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 	// Make sure on object was obtained
 	this.assertNotNil(obj1)
 
-	// Create a separate thread to try and borrow another object
-	//WaitingTestThread wtt = new WaitingTestThread(pool, 200000);
+	// Create a separate goroutine to try and borrow another object
+	//WaitingTestGoroutine wtt = new WaitingTestGoroutine(pool, 200000);
 	ch := borrowAndWait(this.pool, time.Duration(200000)*time.Millisecond)
 
 	// Give wtt time to start
@@ -502,7 +502,7 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 	}
 	this.True(borrowTime >= 200)
 
-	// Check thread was interrupted
+	// Check goroutine was interrupted
 	//assertTrue(wtt._thrown instanceof InterruptedException);
 
 	// Return object to the pool
@@ -521,7 +521,7 @@ func (this *PoolTestSuite) TestEvictWhileEmpty() {
 	this.pool.evict()
 }
 
-type TestThreadArg struct {
+type TestGoroutineArg struct {
 	/** pool to borrow from */
 	pool *ObjectPool
 
@@ -541,7 +541,7 @@ type TestThreadArg struct {
 	expectedObject interface{}
 }
 
-type TestThreadResult struct {
+type TestGoroutineResult struct {
 	complete   bool
 	failed     bool
 	error      error
@@ -552,18 +552,18 @@ type TestThreadResult struct {
 	objectId   interface{}
 }
 
-func NewTesThreadArgSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestThreadArg {
-	return NewTestThreadArg(pool, iter, delay, delay, randomDelay, nil)
+func NewTesGoroutineArgSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestGoroutineArg {
+	return NewTestGoroutineArg(pool, iter, delay, delay, randomDelay, nil)
 }
 
-func NewTestThreadArg(pool *ObjectPool, iter int, startDelay int,
-	holdTime int, randomDelay bool, obj interface{}) *TestThreadArg {
-	return &TestThreadArg{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
+func NewTestGoroutineArg(pool *ObjectPool, iter int, startDelay int,
+	holdTime int, randomDelay bool, obj interface{}) *TestGoroutineArg {
+	return &TestGoroutineArg{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
 }
 
-func threadRun(arg *TestThreadArg) chan TestThreadResult {
-	resultChan := make(chan TestThreadResult, 1)
-	result := TestThreadResult{}
+func goroutineRun(arg *TestGoroutineArg) chan TestGoroutineResult {
+	resultChan := make(chan TestGoroutineResult, 1)
+	result := TestGoroutineResult{}
 	go func() {
 		for i := 0; i < arg.iter; i++ {
 			var startDelay int
@@ -622,12 +622,12 @@ func (this *PoolTestSuite) TestEvictAddObjects() {
 	this.pool.Config.MaxTotal = 2
 	this.pool.Config.MinIdle = 1
 	this.pool.BorrowObject() // numActive = 1, numIdle = 0
-	// Create a test thread that will run once and try a borrow after
+	// Create a test goroutine that will run once and try a borrow after
 	// 150ms fixed delay
-	borrower := NewTesThreadArgSimple(this.pool, 1, 150, false)
+	borrower := NewTesGoroutineArgSimple(this.pool, 1, 150, false)
 	//// Set evictor to run in 100 ms - will create idle instance
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(100)
-	ch := threadRun(borrower)
+	ch := goroutineRun(borrower)
 	result := <-ch
 	close(ch)
 	if debug_test {
@@ -896,7 +896,7 @@ func (this *PoolTestSuite) TestMaxTotalZero() {
 
 func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 	// Config
-	numThreads := 199 // And main thread makes a round 200.
+	numGoroutines := 199 // And main goroutine makes a round 200.
 	numIter := 20
 	delay := 25
 	maxTotal := 10
@@ -906,17 +906,17 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 	this.pool.Config.BlockWhenExhausted = true
 	this.pool.Config.TimeBetweenEvictionRunsMillis = int64(-1)
 
-	// Start threads to borrow objects
-	threadArgs := make([]*TestThreadArg, numThreads)
-	resultChans := make([]chan TestThreadResult, numThreads)
-	for i := 0; i < numThreads; i++ {
-		// Factor of 2 on iterations so main thread does work whilst other
-		// threads are running. Factor of 2 on delay so average delay for
-		// other threads == actual delay for main thread
-		threadArgs[i] = NewTesThreadArgSimple(this.pool, numIter*2, delay*2, true)
-		resultChans[i] = threadRun(threadArgs[i])
+	// Start goroutines to borrow objects
+	goroutineArgs := make([]*TestGoroutineArg, numGoroutines)
+	resultChans := make([]chan TestGoroutineResult, numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		// Factor of 2 on iterations so main goroutine does work whilst other
+		// goroutines are running. Factor of 2 on delay so average delay for
+		// other goroutines == actual delay for main goroutine
+		goroutineArgs[i] = NewTesGoroutineArgSimple(this.pool, numIter*2, delay*2, true)
+		resultChans[i] = goroutineRun(goroutineArgs[i])
 	}
-	// Give the threads a chance to start doing some work
+	// Give the goroutines a chance to start doing some work
 	time.Sleep(time.Duration(5000) * time.Millisecond)
 
 	for i := 0; i < numIter; i++ {
@@ -935,11 +935,11 @@ func (this *PoolTestSuite) TestMaxTotalUnderLoad() {
 		}
 	}
 
-	for i := 0; i < numThreads; i++ {
+	for i := 0; i < numGoroutines; i++ {
 		result := <-resultChans[i]
 		close(resultChans[i])
 		if result.failed {
-			this.Fail(fmt.Sprintf("Thread %v failed: %v", i, result.error.Error()))
+			this.Fail(fmt.Sprintf("Goroutine %v failed: %v", i, result.error.Error()))
 		}
 	}
 }
@@ -1165,10 +1165,10 @@ func (this *PoolTestSuite) TestEvictionInvalid() {
 	p := this.NoErrorWithResult(this.pool.BorrowObject())
 	this.NoError(this.pool.ReturnObject(p))
 
-	// Run eviction in a separate thread
+	// Run eviction in a separate goroutine
 	go func() {
 		if debug_test {
-			fmt.Println("TestEvictionInvalid evict thread.")
+			fmt.Println("TestEvictionInvalid evict goroutine.")
 		}
 		this.pool.evict()
 	}()
@@ -1201,7 +1201,7 @@ func (this *PoolTestSuite) TestConcurrentInvalidate() {
 			this.NoError(this.pool.ReturnObject(active[i]))
 		}
 	}
-	nThreads := 20
+	nGoroutines := 20
 	nIterations := 60
 	// Randomly generated list of distinct invalidation targets
 	targets := make(map[int]bool)
@@ -1212,9 +1212,9 @@ func (this *PoolTestSuite) TestConcurrentInvalidate() {
 			targ = rand.Intn(nObjects)
 		}
 		targets[targ] = true
-		// Launch nThreads threads all trying to invalidate the target
-		results := make(chan bool, nThreads)
-		for i := 0; i < nThreads; i++ {
+		// Launch nGoroutines goroutines all trying to invalidate the target
+		results := make(chan bool, nGoroutines)
+		for i := 0; i < nGoroutines; i++ {
 			go func(pool *ObjectPool, obj *TestObject) {
 				err := pool.InvalidateObject(obj)
 				_, ok := err.(*IllegalStatusErr)
@@ -1228,7 +1228,7 @@ func (this *PoolTestSuite) TestConcurrentInvalidate() {
 				}
 			}(this.pool, active[targ])
 		}
-		for i := 0; i < nThreads; i++ {
+		for i := 0; i < nGoroutines; i++ {
 			done := <-results
 			this.True(done)
 		}
@@ -1314,38 +1314,38 @@ func (this *PoolTestSuite) TestMinIdleMaxTotal() {
 	this.Equal(10, this.pool.GetNumIdle(), "Should be 10 idle, found %v", this.pool.GetNumIdle())
 }
 
-func runTestThreads(t *testing.T, numThreads int, iterations int, delay int, testPool *ObjectPool) {
+func runTestGoroutines(t *testing.T, numGoroutines int, iterations int, delay int, testPool *ObjectPool) {
 
-	arg := NewTestThreadArg(testPool, iterations, delay, delay, true, nil)
-	resultChans := make([]chan TestThreadResult, numThreads)
-	for i := 0; i < numThreads; i++ {
-		resultChans[i] = threadRun(arg)
+	arg := NewTestGoroutineArg(testPool, iterations, delay, delay, true, nil)
+	resultChans := make([]chan TestGoroutineResult, numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		resultChans[i] = goroutineRun(arg)
 	}
-	results := make([]TestThreadResult, numThreads)
-	failedThreads := make([]int, 0)
-	for i := 0; i < numThreads; i++ {
+	results := make([]TestGoroutineResult, numGoroutines)
+	failedGoroutines := make([]int, 0)
+	for i := 0; i < numGoroutines; i++ {
 		result := <-resultChans[i]
 		results[i] = result
 		close(resultChans[i])
 		if result.failed {
-			failedThreads = append(failedThreads, i)
+			failedGoroutines = append(failedGoroutines, i)
 		}
 	}
-	if len(failedThreads) > 0 {
-		for _, t := range failedThreads {
+	if len(failedGoroutines) > 0 {
+		for _, t := range failedGoroutines {
 			if debug_test {
-				fmt.Printf("Thread %v failed %v \n", t, results[t].error)
+				fmt.Printf("Goroutine %v failed %v \n", t, results[t].error)
 			}
 		}
-		assert.Fail(t, fmt.Sprintf("Thread %v failed", failedThreads))
+		assert.Fail(t, fmt.Sprintf("Goroutine %v failed", failedGoroutines))
 	}
 }
 
-func (this *PoolTestSuite) TestThreaded1() {
+func (this *PoolTestSuite) TestGoroutineed1() {
 	this.pool.Config.MaxTotal = 15
 	this.pool.Config.MaxIdle = 15
 	this.pool.Config.MaxWaitMillis = int64(1000)
-	runTestThreads(this.T(), 20, 100, 50, this.pool)
+	runTestGoroutines(this.T(), 20, 100, 50, this.pool)
 }
 
 func (this *PoolTestSuite) TestMaxTotalInvariant() {
@@ -1358,10 +1358,10 @@ func (this *PoolTestSuite) TestMaxTotalInvariant() {
 	this.pool.Config.MaxIdle = -1
 	this.pool.Config.TestOnReturn = true
 	this.pool.Config.MaxWaitMillis = int64(1000)
-	runTestThreads(this.T(), 5, 10, 50, this.pool)
+	runTestGoroutines(this.T(), 5, 10, 50, this.pool)
 }
 
-func concurrentBorrowAndEvictThread(borrow bool, pool *ObjectPool) chan interface{} {
+func concurrentBorrowAndEvictGoroutine(borrow bool, pool *ObjectPool) chan interface{} {
 	ch := make(chan interface{}, 1)
 	go func(borrow bool, pool *ObjectPool) {
 		if borrow {
@@ -1382,8 +1382,8 @@ func (this *PoolTestSuite) TestConcurrentBorrowAndEvict() {
 	this.pool.Config.MaxWaitMillis = 1000
 
 	for i := 0; i < 5000; i++ {
-		one := concurrentBorrowAndEvictThread(true, this.pool)
-		two := concurrentBorrowAndEvictThread(false, this.pool)
+		one := concurrentBorrowAndEvictGoroutine(true, this.pool)
+		two := concurrentBorrowAndEvictGoroutine(false, this.pool)
 
 		obj := <-one
 		close(one)
@@ -1399,10 +1399,10 @@ func (this *PoolTestSuite) TestConcurrentBorrowAndEvict() {
 	}
 }
 
-//Verifies that concurrent threads never "share" instances
+//Verifies that concurrent goroutines never "share" instances
 func (this *PoolTestSuite) TestNoInstanceOverlap() {
 	maxTotal := 5
-	numThreads := 100
+	numGoroutines := 100
 	delay := 1
 	iterations := 1000
 	this.pool.Config.MaxTotal = maxTotal
@@ -1410,7 +1410,7 @@ func (this *PoolTestSuite) TestNoInstanceOverlap() {
 	this.pool.Config.TestOnBorrow = true
 	this.pool.Config.BlockWhenExhausted = true
 	this.pool.Config.MaxWaitMillis = int64(-1)
-	runTestThreads(this.T(), numThreads, iterations, delay, this.pool)
+	runTestGoroutines(this.T(), numGoroutines, iterations, delay, this.pool)
 	this.Equal(0, this.pool.GetDestroyedByBorrowValidationCount())
 }
 
@@ -1423,8 +1423,8 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockClosePool() {
 	// Make sure an object was obtained
 	this.NotNil(obj1)
 
-	// Create a separate thread to try and borrow another object
-	ch := waitTestThread(this.pool, 200)
+	// Create a separate goroutine to try and borrow another object
+	ch := waitTestGoroutine(this.pool, 200)
 	// Give wtt time to start
 	sleep(200)
 
@@ -1434,17 +1434,17 @@ func (this *PoolTestSuite) TestWhenExhaustedBlockClosePool() {
 	// Give interrupt time to take effect
 	sleep(200)
 
-	// Check thread was interrupted
+	// Check goroutine was interrupted
 	result := <-ch
 	close(ch)
 	_, ok := result.error.(*collections.InterruptedErr)
 	this.True(ok, "expect InterruptedErr, but get: %v", reflect.TypeOf(result.error))
 }
 
-func waitTestThread(pool *ObjectPool, pause int) chan TestThreadResult {
-	ch := make(chan TestThreadResult, 1)
+func waitTestGoroutine(pool *ObjectPool, pause int) chan TestGoroutineResult {
+	ch := make(chan TestGoroutineResult, 1)
 	go func() {
-		result := TestThreadResult{}
+		result := TestGoroutineResult{}
 		result.preborrow = currentTimeMillis()
 		obj, err := pool.BorrowObject()
 		result.objectId = obj
@@ -1539,28 +1539,28 @@ func (this *PoolTestSuite) TestBrokenFactoryShouldNotBlockPool() {
 }
 
 /*
- * Test multi-threaded pool access.
- * Multiple threads, but maxTotal only allows half the threads to succeed.
+ * Test multi-goroutineed pool access.
+ * Multiple goroutines, but maxTotal only allows half the goroutines to succeed.
  *
  * This test was prompted by Continuum build failures in the Commons DBCP test case:
- * TestPerUserPoolDataSource.testMultipleThreads2()
+ * TestPerUserPoolDataSource.testMultipleGoroutines2()
  * Let's see if the this fails on Continuum too!
  */
-func (this *PoolTestSuite) TestMaxWaitMultiThreaded() {
+func (this *PoolTestSuite) TestMaxWaitMultiGoroutineed() {
 	maxWait := 500          // wait for connection
 	holdTime := 2 * maxWait // how long to hold connection
-	threads := 10           // number of threads to grab the object initially
+	goroutines := 10        // number of goroutines to grab the object initially
 	this.pool.Config.BlockWhenExhausted = true
 	this.pool.Config.MaxWaitMillis = int64(maxWait)
-	this.pool.Config.MaxTotal = threads
-	// Create enough threads so half the threads will have to wait
-	resultChans := make([]chan TestThreadResult, threads*2)
+	this.pool.Config.MaxTotal = goroutines
+	// Create enough goroutines so half the goroutines will have to wait
+	resultChans := make([]chan TestGoroutineResult, goroutines*2)
 	origin := currentTimeMillis() - 1000
 	for i := 0; i < len(resultChans); i++ {
-		resultChans[i] = waitTestThread(this.pool, holdTime)
+		resultChans[i] = waitTestGoroutine(this.pool, holdTime)
 	}
 	var failed int = 0
-	results := make([]TestThreadResult, len(resultChans))
+	results := make([]TestGoroutineResult, len(resultChans))
 	for i := 0; i < len(resultChans); i++ {
 		ch := resultChans[i]
 		result := <-ch
@@ -1574,8 +1574,8 @@ func (this *PoolTestSuite) TestMaxWaitMultiThreaded() {
 		fmt.Println(
 			"MaxWait: ", maxWait,
 			" HoldTime: ", holdTime,
-			" MaxTotal: ", threads,
-			" Threads: ", len(resultChans),
+			" MaxTotal: ", goroutines,
+			" Goroutines: ", len(resultChans),
 			" Failed: ", failed)
 		for _, result := range results {
 			fmt.Println(
@@ -1587,21 +1587,21 @@ func (this *PoolTestSuite) TestMaxWaitMultiThreaded() {
 				" ObjId: ", result.objectId)
 		}
 	}
-	this.Equal(len(resultChans)/2, failed, "Expected half the threads to fail")
+	this.Equal(len(resultChans)/2, failed, "Expected half the goroutines to fail")
 }
 
 /**
 * Test the following scenario:
-*   Thread 1 borrows an instance
-*   Thread 2 starts to borrow another instance before thread 1 returns its instance
-*   Thread 1 returns its instance while thread 2 is validating its newly created instance
-* The test verifies that the instance created by Thread 2 is not leaked.
+*   Goroutine 1 borrows an instance
+*   Goroutine 2 starts to borrow another instance before goroutine 1 returns its instance
+*   Goroutine 1 returns its instance while goroutine 2 is validating its newly created instance
+* The test verifies that the instance created by Goroutine 2 is not leaked.
  */
 func (this *PoolTestSuite) TestMakeConcurrentWithReturn() {
 	this.pool.Config.TestOnBorrow = true
 	this.factory.setValid(true)
 	// Borrow and return an instance, with a short wait
-	ch := waitTestThread(this.pool, 200)
+	ch := waitTestGoroutine(this.pool, 200)
 	sleep(50) // wait for validation to succeed
 	// Slow down validation and borrow an instance
 	this.factory.setValidateLatency(400)
@@ -1615,7 +1615,7 @@ func (this *PoolTestSuite) TestMakeConcurrentWithReturn() {
 }
 
 /**
- * Verify that threads waiting on a depleted pool get served when a checked out object is
+ * Verify that goroutines waiting on a depleted pool get served when a checked out object is
  * invalidated.
  *
  * JIRA: POOL-240
@@ -1625,15 +1625,15 @@ func (this *PoolTestSuite) TestInvalidateFreesCapacity() {
 	this.pool.Config.MaxWaitMillis = 500
 	this.pool.Config.BlockWhenExhausted = true
 	// Borrow an instance and hold if for 5 seconds
-	ch1 := waitTestThread(this.pool, 5000)
+	ch1 := waitTestGoroutine(this.pool, 5000)
 	// Borrow another instance
 	obj := this.NoErrorWithResult(this.pool.BorrowObject())
-	// Launch another thread - will block, but fail in 500 ms
-	ch2 := waitTestThread(this.pool, 100)
-	// Invalidate the object borrowed by this thread - should allow thread2 to create
+	// Launch another goroutine - will block, but fail in 500 ms
+	ch2 := waitTestGoroutine(this.pool, 100)
+	// Invalidate the object borrowed by this goroutine - should allow goroutine2 to create
 	sleep(20)
 	this.NoError(this.pool.InvalidateObject(obj))
-	sleep(600) // Wait for thread2 to timeout
+	sleep(600) // Wait for goroutine2 to timeout
 	result2 := <-ch2
 	close(ch2)
 	if result2.error != nil {
@@ -1644,7 +1644,7 @@ func (this *PoolTestSuite) TestInvalidateFreesCapacity() {
 }
 
 /**
-* Verify that threads waiting on a depleted pool get served when a returning object fails
+* Verify that goroutines waiting on a depleted pool get served when a returning object fails
 * validation.
 *
 * JIRA: POOL-240
@@ -1658,9 +1658,9 @@ func (this *PoolTestSuite) TestValidationFailureOnReturnFreesCapacity() {
 	this.pool.Config.TestOnReturn = true
 	this.pool.Config.TestOnBorrow = false
 	// Borrow an instance and hold if for 5 seconds
-	ch1 := waitTestThread(this.pool, 5000)
+	ch1 := waitTestGoroutine(this.pool, 5000)
 	// Borrow another instance and return it after 500 ms (validation will fail)
-	ch2 := waitTestThread(this.pool, 500)
+	ch2 := waitTestGoroutine(this.pool, 500)
 	sleep(50)
 	// Try to borrow an object
 	obj := this.NoErrorWithResult(this.pool.BorrowObject())

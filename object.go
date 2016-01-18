@@ -49,7 +49,7 @@ func currentTimeMillis() int64 {
 }
 
 func (this *PooledObject) GetActiveTimeMillis() int64 {
-	// Take copies to avoid threading issues
+	// Take copies to avoid concurrent issues
 	rTime := this.LastReturnTime
 	bTime := this.LastBorrowTime
 
@@ -62,7 +62,7 @@ func (this *PooledObject) GetActiveTimeMillis() int64 {
 func (this *PooledObject) GetIdleTimeMillis() int64 {
 	elapsed := currentTimeMillis() - this.LastReturnTime
 	// elapsed may be negative if:
-	// - another thread updates lastReturnTime during the calculation window
+	// - another goroutine updates lastReturnTime during the calculation window
 	// - currentTimeMillis() is not monotonic (e.g. system time is set back)
 	if elapsed >= 0 {
 		return elapsed

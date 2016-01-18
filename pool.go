@@ -480,7 +480,7 @@ func (this *ObjectPool) Close() {
 	// This clear removes any idle objects
 	this.Clear()
 
-	// Release any threads that were waiting for an object
+	// Release any goroutines that were waiting for an object
 	this.idleObjects.InterruptTakeWaiters()
 }
 
@@ -577,7 +577,7 @@ func (this *ObjectPool) evict() {
 
 		underTest = this.evictionIterator.Next().(*PooledObject)
 		if underTest == nil {
-			// Object was borrowed in another thread
+			// Object was borrowed in another goroutine
 			// Don't count this as an eviction test so reduce i;
 			i--
 			this.evictionIterator = nil
@@ -585,7 +585,7 @@ func (this *ObjectPool) evict() {
 		}
 
 		if !underTest.StartEvictionTest() {
-			// Object was borrowed in another thread
+			// Object was borrowed in another goroutine
 			// Don't count this as an eviction test so reduce i;
 			i--
 			continue
@@ -593,7 +593,7 @@ func (this *ObjectPool) evict() {
 
 		// User provided eviction policy could throw all sorts of
 		// crazy exceptions. Protect against such an exception
-		// killing the eviction thread.
+		// killing the eviction goroutine.
 
 		evict := evictionPolicy.Evict(&evictionConfig, underTest, this.idleObjects.Size())
 
