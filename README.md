@@ -6,7 +6,7 @@ Go Commons Pool
 [![Coverage Status](https://coveralls.io/repos/jolestar/go-commons-pool/badge.svg?branch=master&service=github&_day=201606)](https://coveralls.io/github/jolestar/go-commons-pool?branch=master)
 [![GoDoc](http://godoc.org/github.com/jolestar/go-commons-pool?status.svg)](http://godoc.org/github.com/jolestar/go-commons-pool)
 
-The Go Commons Pool is a generic object pool for [Golang](http://golang.org/), direct translate from [Apache Commons Pool](https://commons.apache.org/proper/commons-pool/).
+The Go Commons Pool is a generic object pool for [Golang](http://golang.org/), direct rewrite from [Apache Commons Pool](https://commons.apache.org/proper/commons-pool/).
 
 
 Features
@@ -16,7 +16,7 @@ Features
 	* Pool LIFO (last in, first out) or FIFO (first in, first out) 
 	* Pool cap config
 	* Pool object validate config
-	* Pool block and max waiting time config
+	* Pool object borrow block and max waiting time config
 	* Pool object eviction config
 	* Pool object abandon config
 
@@ -133,6 +133,10 @@ For Apache commons pool user
 * No KeyedObjectPool
 * No ProxiedObjectPool
 * No pool stats (TODO)
+
+FAQ
+-------
+[FAQ](https://github.com/jolestar/go-commons-pool/wiki/FAQ)
 
 How to contribute
 -------
