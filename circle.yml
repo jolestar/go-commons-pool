@@ -4,7 +4,7 @@ test:
     - go get github.com/mattn/goveralls
     - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
   override:
-    - go test -v -race
+    - go test -v -race ./...
     - bash coverage
   post:
     - goveralls -coverprofile=gover.coverprofile -repotoken=$COVERALLS_TOKEN
