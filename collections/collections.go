@@ -19,11 +19,11 @@ type SyncIdentityMap struct {
 func NewSyncMap() *SyncIdentityMap {
 	return &SyncIdentityMap{m: make(map[uintptr]interface{})}
 }
-func (this *SyncIdentityMap) Get(key interface{}) interface{} {
-	this.RLock()
+func (m *SyncIdentityMap) Get(key interface{}) interface{} {
+	m.RLock()
 	keyPtr := genKey(key)
-	value := this.m[keyPtr]
-	this.RUnlock()
+	value := m.m[keyPtr]
+	m.RUnlock()
 	return value
 }
 
@@ -32,35 +32,35 @@ func genKey(key interface{}) uintptr {
 	return keyValue.Pointer()
 }
 
-func (this *SyncIdentityMap) Put(key interface{}, value interface{}) {
-	this.Lock()
+func (m *SyncIdentityMap) Put(key interface{}, value interface{}) {
+	m.Lock()
 	keyPtr := genKey(key)
-	this.m[keyPtr] = value
-	this.Unlock()
+	m.m[keyPtr] = value
+	m.Unlock()
 }
 
-func (this *SyncIdentityMap) Remove(key interface{}) {
-	this.Lock()
+func (m *SyncIdentityMap) Remove(key interface{}) {
+	m.Lock()
 	keyPtr := genKey(key)
-	delete(this.m, keyPtr)
-	this.Unlock()
+	delete(m.m, keyPtr)
+	m.Unlock()
 }
 
-func (this *SyncIdentityMap) Size() int {
-	this.RLock()
-	defer this.RUnlock()
-	return len(this.m)
+func (m *SyncIdentityMap) Size() int {
+	m.RLock()
+	defer m.RUnlock()
+	return len(m.m)
 }
 
 /**
  * for support multi thread, just copy all map value to slice
  */
-func (this *SyncIdentityMap) Values() []interface{} {
-	this.RLock()
-	defer this.RUnlock()
-	list := make([]interface{}, len(this.m))
+func (m *SyncIdentityMap) Values() []interface{} {
+	m.RLock()
+	defer m.RUnlock()
+	list := make([]interface{}, len(m.m))
 	i := 0
-	for _, v := range this.m {
+	for _, v := range m.m {
 		list[i] = v
 		i++
 	}

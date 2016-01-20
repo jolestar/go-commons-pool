@@ -17,13 +17,13 @@ func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 }
 
 //wait for signal return remain wait time, and is interrupted
-func (this *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
-	this.setHasWaiters(true)
-	ch := this.signal
+func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
+	cond.setHasWaiters(true)
+	ch := cond.signal
 	//wait should unlock mutex,  if not will cause deadlock
-	this.L.Unlock()
-	defer this.setHasWaiters(false)
-	defer this.L.Lock()
+	cond.L.Unlock()
+	defer cond.setHasWaiters(false)
+	defer cond.L.Lock()
 
 	begin := time.Now().UnixNano()
 	select {
@@ -36,38 +36,38 @@ func (this *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, 
 	}
 }
 
-func (this *TimeoutCond) setHasWaiters(value bool) {
-	this.hasWaiters = value
+func (cond *TimeoutCond) setHasWaiters(value bool) {
+	cond.hasWaiters = value
 }
 
 //Queries whether any goroutine are waiting on this condition
-func (this *TimeoutCond) HasWaiters() bool {
-	return this.hasWaiters
+func (cond *TimeoutCond) HasWaiters() bool {
+	return cond.hasWaiters
 }
 
 //wait for signal return waiting is interrupted
-func (this *TimeoutCond) Wait() bool {
-	this.setHasWaiters(true)
+func (cond *TimeoutCond) Wait() bool {
+	cond.setHasWaiters(true)
 	//copy signal in lock, avoid data race with Interrupt
-	ch := this.signal
-	this.L.Unlock()
-	defer this.setHasWaiters(false)
-	defer this.L.Lock()
+	ch := cond.signal
+	cond.L.Unlock()
+	defer cond.setHasWaiters(false)
+	defer cond.L.Lock()
 	_, ok := <-ch
 	return !ok
 }
 
 // Signal wakes one goroutine waiting on c, if there is any.
-func (this *TimeoutCond) Signal() {
+func (cond *TimeoutCond) Signal() {
 	select {
-	case this.signal <- 1:
+	case cond.signal <- 1:
 	default:
 	}
 }
 
-func (this *TimeoutCond) Interrupt() {
-	this.L.Lock()
-	defer this.L.Unlock()
-	close(this.signal)
-	this.signal = make(chan int, 0)
+func (cond *TimeoutCond) Interrupt() {
+	cond.L.Lock()
+	defer cond.L.Unlock()
+	close(cond.signal)
+	cond.signal = make(chan int, 0)
 }

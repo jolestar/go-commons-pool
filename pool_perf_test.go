@@ -61,15 +61,15 @@ func NewSleepingObjectFactory() *SleepingObjectFactory {
 	return &SleepingObjectFactory{counter: concurrent.AtomicInteger(0)}
 }
 
-func (this *SleepingObjectFactory) MakeObject() (*PooledObject, error) {
+func (f *SleepingObjectFactory) MakeObject() (*PooledObject, error) {
 	if debug_test {
-		fmt.Println("factory MakeObject", this.counter.Get())
+		fmt.Println("factory MakeObject", f.counter.Get())
 	}
 	sleep(500)
-	return NewPooledObject(getNthObject(int(this.counter.Get()))), nil
+	return NewPooledObject(getNthObject(int(f.counter.Get()))), nil
 }
 
-func (this *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
+func (f *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
 	if debug_test {
 		fmt.Println("factory DestroyObject", object)
 	}
@@ -77,7 +77,7 @@ func (this *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
 	return nil
 }
 
-func (this *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
+func (f *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
 	if debug_test {
 		fmt.Println("factory ValidateObject", object)
 	}
@@ -85,7 +85,7 @@ func (this *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
 	return true
 }
 
-func (this *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
+func (f *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
 	if debug_test {
 		fmt.Println("factory ActivateObject", object)
 		defer fmt.Println("factory ActivateObject end")
@@ -94,7 +94,7 @@ func (this *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
 	return nil
 }
 
-func (this *SleepingObjectFactory) PassivateObject(object *PooledObject) error {
+func (f *SleepingObjectFactory) PassivateObject(object *PooledObject) error {
 	if debug_test {
 		fmt.Println("factory PassivateObject", object)
 	}

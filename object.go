@@ -23,7 +23,7 @@ const (
 )
 
 type TrackedUse interface {
-	//Get the last time this object was used in ms.
+	//Get the last time o object was used in ms.
 	GetLastUsed() int64
 }
 
@@ -48,10 +48,10 @@ func currentTimeMillis() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
-func (this *PooledObject) GetActiveTimeMillis() int64 {
+func (o *PooledObject) GetActiveTimeMillis() int64 {
 	// Take copies to avoid concurrent issues
-	rTime := this.LastReturnTime
-	bTime := this.LastBorrowTime
+	rTime := o.LastReturnTime
+	bTime := o.LastBorrowTime
 
 	if rTime > bTime {
 		return rTime - bTime
@@ -59,8 +59,8 @@ func (this *PooledObject) GetActiveTimeMillis() int64 {
 	return currentTimeMillis() - bTime
 }
 
-func (this *PooledObject) GetIdleTimeMillis() int64 {
-	elapsed := currentTimeMillis() - this.LastReturnTime
+func (o *PooledObject) GetIdleTimeMillis() int64 {
+	elapsed := currentTimeMillis() - o.LastReturnTime
 	// elapsed may be negative if:
 	// - another goroutine updates lastReturnTime during the calculation window
 	// - currentTimeMillis() is not monotonic (e.g. system time is set back)
@@ -71,31 +71,31 @@ func (this *PooledObject) GetIdleTimeMillis() int64 {
 	}
 }
 
-func (this *PooledObject) GetLastUsedTime() int64 {
-	trackedUse, ok := this.Object.(TrackedUse)
+func (o *PooledObject) GetLastUsedTime() int64 {
+	trackedUse, ok := o.Object.(TrackedUse)
 	if ok {
-		if trackedUse.GetLastUsed() > this.LastUseTime {
+		if trackedUse.GetLastUsed() > o.LastUseTime {
 			return trackedUse.GetLastUsed()
 		} else {
-			return this.LastUseTime
+			return o.LastUseTime
 		}
 	}
-	return this.LastUseTime
+	return o.LastUseTime
 }
 
-func (this *PooledObject) doAllocate() bool {
-	if this.state == IDLE {
-		this.state = ALLOCATED
-		this.LastBorrowTime = currentTimeMillis()
-		this.LastUseTime = this.LastBorrowTime
-		this.BorrowedCount++
+func (o *PooledObject) doAllocate() bool {
+	if o.state == IDLE {
+		o.state = ALLOCATED
+		o.LastBorrowTime = currentTimeMillis()
+		o.LastUseTime = o.LastBorrowTime
+		o.BorrowedCount++
 		//if (logAbandoned) {
 		//borrowedBy = new AbandonedObjectCreatedException();
 		//}
 		return true
-	} else if this.state == EVICTION {
+	} else if o.state == EVICTION {
 		// TODO Allocate anyway and ignore eviction test
-		this.state = EVICTION_RETURN_TO_HEAD
+		o.state = EVICTION_RETURN_TO_HEAD
 		return false
 	}
 	// TODO if validating and testOnBorrow == true then pre-allocate for
@@ -103,87 +103,87 @@ func (this *PooledObject) doAllocate() bool {
 	return false
 }
 
-func (this *PooledObject) Allocate() bool {
-	this.lock.Lock()
-	result := this.doAllocate()
-	this.lock.Unlock()
+func (o *PooledObject) Allocate() bool {
+	o.lock.Lock()
+	result := o.doAllocate()
+	o.lock.Unlock()
 	return result
 }
 
-func (this *PooledObject) doDeallocate() bool {
-	if this.state == ALLOCATED ||
-		this.state == RETURNING {
-		this.state = IDLE
-		this.LastReturnTime = currentTimeMillis()
+func (o *PooledObject) doDeallocate() bool {
+	if o.state == ALLOCATED ||
+		o.state == RETURNING {
+		o.state = IDLE
+		o.LastReturnTime = currentTimeMillis()
 		//borrowedBy = nil;
 		return true
 	}
 	return false
 }
 
-func (this *PooledObject) Deallocate() bool {
-	this.lock.Lock()
-	result := this.doDeallocate()
-	this.lock.Unlock()
+func (o *PooledObject) Deallocate() bool {
+	o.lock.Lock()
+	result := o.doDeallocate()
+	o.lock.Unlock()
 	return result
 }
 
-func (this *PooledObject) Invalidate() {
-	this.lock.Lock()
-	this.invalidate()
-	this.lock.Unlock()
+func (o *PooledObject) Invalidate() {
+	o.lock.Lock()
+	o.invalidate()
+	o.lock.Unlock()
 }
 
-func (this *PooledObject) invalidate() {
-	this.state = INVALID
+func (o *PooledObject) invalidate() {
+	o.state = INVALID
 }
 
-func (this *PooledObject) GetState() PooledObjectState {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	return this.state
+func (o *PooledObject) GetState() PooledObjectState {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	return o.state
 }
 
-func (this *PooledObject) MarkAbandoned() {
-	this.lock.Lock()
-	this.markAbandoned()
-	this.lock.Unlock()
+func (o *PooledObject) MarkAbandoned() {
+	o.lock.Lock()
+	o.markAbandoned()
+	o.lock.Unlock()
 }
 
-func (this *PooledObject) markAbandoned() {
-	this.state = ABANDONED
+func (o *PooledObject) markAbandoned() {
+	o.state = ABANDONED
 }
 
-func (this *PooledObject) MarkReturning() {
-	this.lock.Lock()
-	this.markReturning()
-	this.lock.Unlock()
+func (o *PooledObject) MarkReturning() {
+	o.lock.Lock()
+	o.markReturning()
+	o.lock.Unlock()
 }
 
-func (this *PooledObject) markReturning() {
-	this.state = RETURNING
+func (o *PooledObject) markReturning() {
+	o.state = RETURNING
 }
 
-func (this *PooledObject) StartEvictionTest() bool {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	if this.state == IDLE {
-		this.state = EVICTION
+func (o *PooledObject) StartEvictionTest() bool {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	if o.state == IDLE {
+		o.state = EVICTION
 		return true
 	}
 
 	return false
 }
 
-func (this *PooledObject) EndEvictionTest(idleQueue *collections.LinkedBlockingDeque) bool {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	if this.state == EVICTION {
-		this.state = IDLE
+func (o *PooledObject) EndEvictionTest(idleQueue *collections.LinkedBlockingDeque) bool {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	if o.state == EVICTION {
+		o.state = IDLE
 		return true
-	} else if this.state == EVICTION_RETURN_TO_HEAD {
-		this.state = IDLE
-		if !idleQueue.OfferFirst(this) {
+	} else if o.state == EVICTION_RETURN_TO_HEAD {
+		o.state = IDLE
+		if !idleQueue.OfferFirst(o) {
 			// TODO - Should never happen
 			panic(fmt.Errorf("Should never happen"))
 		}

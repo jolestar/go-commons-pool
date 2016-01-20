@@ -21,15 +21,15 @@ type LinkedBlockDequeTestSuite struct {
 	deque *LinkedBlockingDeque
 }
 
-func (this *LinkedBlockDequeTestSuite) NoErrorWithResult(object interface{}, err error) interface{} {
-	//this.NotNil(object)
-	this.Nil(err)
+func (suit *LinkedBlockDequeTestSuite) NoErrorWithResult(object interface{}, err error) interface{} {
+	//suit.NotNil(object)
+	suit.Nil(err)
 	return object
 }
 
-func (this *LinkedBlockDequeTestSuite) ErrorWithResult(object interface{}, err error) error {
-	this.Nil(object)
-	this.NotNil(err)
+func (suit *LinkedBlockDequeTestSuite) ErrorWithResult(object interface{}, err error) error {
+	suit.Nil(object)
+	suit.NotNil(err)
 	return err
 }
 
@@ -37,242 +37,242 @@ func TestLinkedBlockQueueTestSuite(t *testing.T) {
 	suite.Run(t, new(LinkedBlockDequeTestSuite))
 }
 
-func (this *LinkedBlockDequeTestSuite) SetupTest() {
-	this.deque = NewDeque(2)
+func (suit *LinkedBlockDequeTestSuite) SetupTest() {
+	suit.deque = NewDeque(2)
 }
 
-func (this *LinkedBlockDequeTestSuite) TestAddFirst() {
-	this.deque.AddFirst(ONE)
-	this.deque.AddFirst(TWO)
+func (suit *LinkedBlockDequeTestSuite) TestAddFirst() {
+	suit.deque.AddFirst(ONE)
+	suit.deque.AddFirst(TWO)
 	//fmt.Println(deque.Size())
-	this.Equal(2, this.deque.Size(), "deque size != 2")
-	e := this.deque.AddFirst(THREE)
-	assert.NotNil(this.T(), e, "deque can not add three element")
-	this.Equal(TWO, this.deque.PollFirst())
+	suit.Equal(2, suit.deque.Size(), "deque size != 2")
+	e := suit.deque.AddFirst(THREE)
+	assert.NotNil(suit.T(), e, "deque can not add three element")
+	suit.Equal(TWO, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestAddLast() {
-	this.deque.AddLast(ONE)
-	this.deque.AddLast(TWO)
-	this.Equal(2, this.deque.Size())
-	e := this.deque.AddLast(THREE)
-	assert.NotNil(this.T(), e, "deque can not add three element")
-	this.Equal(ONE, this.deque.PollFirst())
+func (suit *LinkedBlockDequeTestSuite) TestAddLast() {
+	suit.deque.AddLast(ONE)
+	suit.deque.AddLast(TWO)
+	suit.Equal(2, suit.deque.Size())
+	e := suit.deque.AddLast(THREE)
+	assert.NotNil(suit.T(), e, "deque can not add three element")
+	suit.Equal(ONE, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestOfferFirst() {
-	this.deque.OfferFirst(ONE)
-	this.deque.OfferFirst(TWO)
-	this.Equal(2, this.deque.Size())
-	this.deque.OfferFirst(nil)
-	this.Equal(TWO, this.deque.PollFirst())
+func (suit *LinkedBlockDequeTestSuite) TestOfferFirst() {
+	suit.deque.OfferFirst(ONE)
+	suit.deque.OfferFirst(TWO)
+	suit.Equal(2, suit.deque.Size())
+	suit.deque.OfferFirst(nil)
+	suit.Equal(TWO, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestOfferLast() {
-	this.deque.OfferLast(ONE)
-	this.deque.OfferLast(TWO)
-	this.Equal(2, this.deque.Size())
-	this.deque.OfferLast(nil)
-	this.Equal(ONE, this.deque.PollFirst())
+func (suit *LinkedBlockDequeTestSuite) TestOfferLast() {
+	suit.deque.OfferLast(ONE)
+	suit.deque.OfferLast(TWO)
+	suit.Equal(2, suit.deque.Size())
+	suit.deque.OfferLast(nil)
+	suit.Equal(ONE, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPutFirst() {
-	this.deque.PutFirst(nil)
-	this.deque.PutFirst(ONE)
-	this.deque.PutFirst(TWO)
-	this.Equal(2, this.deque.Size())
-	this.Equal(TWO, this.deque.PollFirst())
+func (suit *LinkedBlockDequeTestSuite) TestPutFirst() {
+	suit.deque.PutFirst(nil)
+	suit.deque.PutFirst(ONE)
+	suit.deque.PutFirst(TWO)
+	suit.Equal(2, suit.deque.Size())
+	suit.Equal(TWO, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPutLast() {
-	this.deque.PutLast(nil)
-	this.deque.PutLast(ONE)
-	this.deque.PutLast(TWO)
-	this.Equal(2, this.deque.Size())
-	this.Equal(ONE, this.deque.PollFirst())
+func (suit *LinkedBlockDequeTestSuite) TestPutLast() {
+	suit.deque.PutLast(nil)
+	suit.deque.PutLast(ONE)
+	suit.deque.PutLast(TWO)
+	suit.Equal(2, suit.deque.Size())
+	suit.Equal(ONE, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPutLastWait() {
-	this.deque.PutLast(ONE)
-	this.deque.PutLast(TWO)
+func (suit *LinkedBlockDequeTestSuite) TestPutLastWait() {
+	suit.deque.PutLast(ONE)
+	suit.deque.PutLast(TWO)
 	wait := sync.WaitGroup{}
 	wait.Add(1)
 	go func() {
-		this.deque.PutLast(THREE)
+		suit.deque.PutLast(THREE)
 		wait.Done()
 	}()
 	sleep(100)
-	this.Equal(TWO, this.deque.PollLast())
+	suit.Equal(TWO, suit.deque.PollLast())
 	wait.Wait()
-	this.Equal(2, this.deque.Size())
-	this.Equal(THREE, this.deque.PollLast())
+	suit.Equal(2, suit.deque.Size())
+	suit.Equal(THREE, suit.deque.PollLast())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPutFirstWait() {
-	this.deque.PutFirst(ONE)
-	this.deque.PutFirst(TWO)
+func (suit *LinkedBlockDequeTestSuite) TestPutFirstWait() {
+	suit.deque.PutFirst(ONE)
+	suit.deque.PutFirst(TWO)
 	wait := sync.WaitGroup{}
 	wait.Add(1)
 	go func() {
-		this.deque.PutFirst(THREE)
+		suit.deque.PutFirst(THREE)
 		wait.Done()
 	}()
 	sleep(100)
-	this.Equal(TWO, this.deque.PollFirst())
+	suit.Equal(TWO, suit.deque.PollFirst())
 	wait.Wait()
-	this.Equal(2, this.deque.Size())
-	this.Equal(THREE, this.deque.PollFirst())
+	suit.Equal(2, suit.deque.Size())
+	suit.Equal(THREE, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPollFirst() {
-	assert.Nil(this.T(), this.deque.PollFirst())
-	assert.True(this.T(), this.deque.OfferFirst(ONE))
-	assert.True(this.T(), this.deque.OfferFirst(TWO))
-	this.Equal(TWO, this.deque.PollFirst())
+func (suit *LinkedBlockDequeTestSuite) TestPollFirst() {
+	assert.Nil(suit.T(), suit.deque.PollFirst())
+	assert.True(suit.T(), suit.deque.OfferFirst(ONE))
+	assert.True(suit.T(), suit.deque.OfferFirst(TWO))
+	suit.Equal(TWO, suit.deque.PollFirst())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPollLast() {
-	assert.Nil(this.T(), this.deque.PollLast())
-	assert.True(this.T(), this.deque.OfferFirst(ONE))
-	assert.True(this.T(), this.deque.OfferFirst(TWO))
-	this.Equal(ONE, this.deque.PollLast())
+func (suit *LinkedBlockDequeTestSuite) TestPollLast() {
+	assert.Nil(suit.T(), suit.deque.PollLast())
+	assert.True(suit.T(), suit.deque.OfferFirst(ONE))
+	assert.True(suit.T(), suit.deque.OfferFirst(TWO))
+	suit.Equal(ONE, suit.deque.PollLast())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestTakeFirst() {
-	assert.True(this.T(), this.deque.OfferFirst(ONE))
-	assert.True(this.T(), this.deque.OfferFirst(TWO))
-	this.Equal(TWO, this.NoErrorWithResult(this.deque.TakeFirst()))
+func (suit *LinkedBlockDequeTestSuite) TestTakeFirst() {
+	assert.True(suit.T(), suit.deque.OfferFirst(ONE))
+	assert.True(suit.T(), suit.deque.OfferFirst(TWO))
+	suit.Equal(TWO, suit.NoErrorWithResult(suit.deque.TakeFirst()))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestTakeFirstWait() {
+func (suit *LinkedBlockDequeTestSuite) TestTakeFirstWait() {
 	ch := make(chan interface{}, 1)
 	go func() {
-		o, _ := this.deque.TakeFirst()
+		o, _ := suit.deque.TakeFirst()
 		ch <- o
 	}()
 	sleep(100)
-	this.True(this.deque.OfferFirst(ONE))
+	suit.True(suit.deque.OfferFirst(ONE))
 	o := <-ch
 	close(ch)
-	this.Equal(ONE, o)
+	suit.Equal(ONE, o)
 }
 
-func (this *LinkedBlockDequeTestSuite) TestTakeLastWait() {
+func (suit *LinkedBlockDequeTestSuite) TestTakeLastWait() {
 	ch := make(chan interface{}, 1)
 	go func() {
-		o, _ := this.deque.TakeLast()
+		o, _ := suit.deque.TakeLast()
 		ch <- o
 	}()
 	sleep(100)
-	this.True(this.deque.OfferFirst(ONE))
+	suit.True(suit.deque.OfferFirst(ONE))
 	o := <-ch
 	close(ch)
-	this.Equal(ONE, o)
+	suit.Equal(ONE, o)
 }
 
-func (this *LinkedBlockDequeTestSuite) TestTakeLast() {
-	assert.True(this.T(), this.deque.OfferFirst(ONE))
-	assert.True(this.T(), this.deque.OfferFirst(TWO))
-	this.Equal(ONE, this.NoErrorWithResult(this.deque.TakeLast()))
+func (suit *LinkedBlockDequeTestSuite) TestTakeLast() {
+	assert.True(suit.T(), suit.deque.OfferFirst(ONE))
+	assert.True(suit.T(), suit.deque.OfferFirst(TWO))
+	suit.Equal(ONE, suit.NoErrorWithResult(suit.deque.TakeLast()))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestRemoveFirstOccurence() {
-	this.deque = NewDeque(3)
-	assert.False(this.T(), this.deque.RemoveFirstOccurrence(nil))
-	assert.False(this.T(), this.deque.RemoveFirstOccurrence(ONE))
-	this.deque.AddLast(ONE)
-	this.deque.AddLast(TWO)
-	this.deque.AddLast(ONE)
-	assert.True(this.T(), this.deque.RemoveFirstOccurrence(ONE))
-	assert.True(this.T(), this.deque.Size() == 2)
-	assert.True(this.T(), reflect.DeepEqual(this.deque.ToSlice(), []interface{}{TWO, ONE}))
+func (suit *LinkedBlockDequeTestSuite) TestRemoveFirstOccurence() {
+	suit.deque = NewDeque(3)
+	assert.False(suit.T(), suit.deque.RemoveFirstOccurrence(nil))
+	assert.False(suit.T(), suit.deque.RemoveFirstOccurrence(ONE))
+	suit.deque.AddLast(ONE)
+	suit.deque.AddLast(TWO)
+	suit.deque.AddLast(ONE)
+	assert.True(suit.T(), suit.deque.RemoveFirstOccurrence(ONE))
+	assert.True(suit.T(), suit.deque.Size() == 2)
+	assert.True(suit.T(), reflect.DeepEqual(suit.deque.ToSlice(), []interface{}{TWO, ONE}))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestRemoveLastOccurence() {
-	this.deque = NewDeque(3)
-	assert.False(this.T(), this.deque.RemoveLastOccurrence(nil))
-	assert.False(this.T(), this.deque.RemoveLastOccurrence(ONE))
-	this.deque.AddLast(ONE)
-	this.deque.AddLast(TWO)
-	this.deque.AddLast(ONE)
-	assert.True(this.T(), this.deque.RemoveLastOccurrence(ONE))
-	assert.True(this.T(), this.deque.Size() == 2)
-	assert.True(this.T(), reflect.DeepEqual(this.deque.ToSlice(), []interface{}{ONE, TWO}))
+func (suit *LinkedBlockDequeTestSuite) TestRemoveLastOccurence() {
+	suit.deque = NewDeque(3)
+	assert.False(suit.T(), suit.deque.RemoveLastOccurrence(nil))
+	assert.False(suit.T(), suit.deque.RemoveLastOccurrence(ONE))
+	suit.deque.AddLast(ONE)
+	suit.deque.AddLast(TWO)
+	suit.deque.AddLast(ONE)
+	assert.True(suit.T(), suit.deque.RemoveLastOccurrence(ONE))
+	assert.True(suit.T(), suit.deque.Size() == 2)
+	assert.True(suit.T(), reflect.DeepEqual(suit.deque.ToSlice(), []interface{}{ONE, TWO}))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPeek() {
-	this.deque.AddLast(ONE)
-	this.deque.AddLast(TWO)
-	this.Equal(2, this.deque.Size())
-	this.Equal(ONE, this.deque.PeekFirst())
-	this.Equal(TWO, this.deque.PeekLast())
-	this.Equal(2, this.deque.Size())
+func (suit *LinkedBlockDequeTestSuite) TestPeek() {
+	suit.deque.AddLast(ONE)
+	suit.deque.AddLast(TWO)
+	suit.Equal(2, suit.deque.Size())
+	suit.Equal(ONE, suit.deque.PeekFirst())
+	suit.Equal(TWO, suit.deque.PeekLast())
+	suit.Equal(2, suit.deque.Size())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPollFirstWithTimeout() {
-	assert.Nil(this.T(), this.deque.PollFirst())
-	assert.Nil(this.T(), this.NoErrorWithResult(this.deque.PollFirstWithTimeout(50*time.Millisecond)))
+func (suit *LinkedBlockDequeTestSuite) TestPollFirstWithTimeout() {
+	assert.Nil(suit.T(), suit.deque.PollFirst())
+	assert.Nil(suit.T(), suit.NoErrorWithResult(suit.deque.PollFirstWithTimeout(50*time.Millisecond)))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
-	assert.Nil(this.T(), this.deque.PollLast())
-	assert.Nil(this.T(), this.NoErrorWithResult(this.deque.PollLastWithTimeout(50*time.Millisecond)))
+func (suit *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
+	assert.Nil(suit.T(), suit.deque.PollLast())
+	assert.Nil(suit.T(), suit.NoErrorWithResult(suit.deque.PollLastWithTimeout(50*time.Millisecond)))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestInterrupt() {
+func (suit *LinkedBlockDequeTestSuite) TestInterrupt() {
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	go func() {
 		for i := 0; i < 2; i++ {
 			time.Sleep(time.Duration(1000) * time.Millisecond)
-			this.deque.InterruptTakeWaiters()
-			fmt.Println("TestInterrupt this.deque.InterruptTakeWaiters")
+			suit.deque.InterruptTakeWaiters()
+			fmt.Println("TestInterrupt suit.deque.InterruptTakeWaiters")
 			wait.Done()
 		}
 	}()
 	for i := 0; i < 2; i++ {
-		_, e := this.deque.TakeFirst()
+		_, e := suit.deque.TakeFirst()
 		_, ok := e.(*InterruptedErr)
-		this.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
-		this.NotNil(e.Error())
+		suit.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
+		suit.NotNil(e.Error())
 	}
 	wait.Wait()
 }
 
-func (this *LinkedBlockDequeTestSuite) TestIterator() {
-	this.deque.AddLast(ONE)
-	this.deque.AddLast(TWO)
-	iterator := this.deque.Iterator()
+func (suit *LinkedBlockDequeTestSuite) TestIterator() {
+	suit.deque.AddLast(ONE)
+	suit.deque.AddLast(TWO)
+	iterator := suit.deque.Iterator()
 	var list []int
 	for iterator.HasNext() {
 		item := iterator.Next().(int)
 		list = append(list, item)
 	}
 	//fmt.Println("list:",list)
-	assert.True(this.T(), reflect.DeepEqual(list, []int{ONE, TWO}))
+	assert.True(suit.T(), reflect.DeepEqual(list, []int{ONE, TWO}))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestDescendingIterator() {
-	this.deque.AddLast(ONE)
-	this.deque.AddLast(TWO)
-	iterator := this.deque.DescendingIterator()
+func (suit *LinkedBlockDequeTestSuite) TestDescendingIterator() {
+	suit.deque.AddLast(ONE)
+	suit.deque.AddLast(TWO)
+	iterator := suit.deque.DescendingIterator()
 	var list []int
 	for iterator.HasNext() {
 		item := iterator.Next().(int)
 		list = append(list, item)
 	}
 	//fmt.Println("list:",list)
-	assert.True(this.T(), reflect.DeepEqual(list, []int{TWO, ONE}))
+	assert.True(suit.T(), reflect.DeepEqual(list, []int{TWO, ONE}))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
+func (suit *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	count := 100
-	this.deque = NewDeque(count)
+	suit.deque = NewDeque(count)
 
 	for i := 0; i < count; i++ {
-		this.deque.AddFirst(i)
+		suit.deque.AddFirst(i)
 	}
-	this.Equal(count, this.deque.Size())
+	suit.Equal(count, suit.deque.Size())
 	startWait := sync.WaitGroup{}
 	startWait.Add(1)
 
@@ -284,7 +284,7 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	for i := 0; i < count; i++ {
 		go func(idx int) {
 			startWait.Wait()
-			iterator := this.deque.Iterator()
+			iterator := suit.deque.Iterator()
 			for iterator.HasNext() {
 				item := iterator.Next()
 				if item == nil {
@@ -299,7 +299,7 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	}
 	go func() {
 		startWait.Wait()
-		iterator := this.deque.Iterator()
+		iterator := suit.deque.Iterator()
 		c := 0
 		for iterator.HasNext() {
 			iterator.Next()
@@ -312,7 +312,7 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	}()
 	startWait.Done()
 	endWait.Wait()
-	iterator := this.deque.Iterator()
+	iterator := suit.deque.Iterator()
 	var list []int
 	for iterator.HasNext() {
 		item := iterator.Next().(int)
@@ -320,41 +320,41 @@ func (this *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	}
 	//fmt.Println("list:",list)
 	//fmt.Println("counts:", counts)
-	this.Equal(count/2, this.deque.Size())
-	this.Equal(count/2, len(list))
-	this.Equal(int32(0), hasErr.Get())
+	suit.Equal(count/2, suit.deque.Size())
+	suit.Equal(count/2, len(list))
+	suit.Equal(int32(0), hasErr.Get())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestQueueLock() {
-	this.deque = NewDeque(1)
+func (suit *LinkedBlockDequeTestSuite) TestQueueLock() {
+	suit.deque = NewDeque(1)
 	ch := make(chan int)
 	go func() {
-		ch <- this.NoErrorWithResult(this.deque.TakeFirst()).(int)
+		ch <- suit.NoErrorWithResult(suit.deque.TakeFirst()).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	//time.Sleep(time.Duration(1)*time.Second)
 	go func() {
-		this.deque.PutFirst(1)
+		suit.deque.PutFirst(1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
 	close(ch)
-	this.Equal(1, val)
+	suit.Equal(1, val)
 }
 
-func (this *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
+func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 	count := 100
-	this.deque = NewDeque(count)
+	suit.deque = NewDeque(count)
 	ch := make(chan int, count)
 	for i := 0; i < count; i++ {
 		go func() {
-			ch <- this.NoErrorWithResult(this.deque.TakeFirst()).(int)
+			ch <- suit.NoErrorWithResult(suit.deque.TakeFirst()).(int)
 		}()
 	}
 	sleep(100)
 	for i := 0; i < count; i++ {
 		go func(val int) {
-			this.deque.AddFirst(val)
+			suit.deque.AddFirst(val)
 		}(i)
 	}
 	values := make([]int, count)
@@ -365,9 +365,9 @@ func (this *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 		valueset[val] = val
 	}
 	fmt.Println("TestQueueConcurrent", values)
-	this.Equal(count, len(valueset))
+	suit.Equal(count, len(valueset))
 	close(ch)
-	//this.Equal(1, val)
+	//suit.Equal(1, val)
 }
 
 func currentTimeMillis() int64 {
@@ -378,8 +378,8 @@ func sleep(millisecond int) {
 	time.Sleep(time.Duration(millisecond) * time.Millisecond)
 }
 
-func (this *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
-	this.deque = NewDeque(10)
+func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
+	suit.deque = NewDeque(10)
 	count := 20
 	ch := make(chan int, count/2)
 	timeoutChan := make(chan int, count/2)
@@ -387,7 +387,7 @@ func (this *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 	for i := 0; i < count; i++ {
 		go func() {
 			startWait := currentTimeMillis()
-			r := this.NoErrorWithResult(this.deque.PollFirstWithTimeout(time.Duration(timeout) * time.Millisecond))
+			r := suit.NoErrorWithResult(suit.deque.PollFirstWithTimeout(time.Duration(timeout) * time.Millisecond))
 			endWait := currentTimeMillis()
 			//timeout
 			if r == nil {
@@ -400,14 +400,14 @@ func (this *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 	for i := 0; i < count/2; i++ {
 		go func(val int) {
 			sleep(int(rand.Int31n(int32(timeout))))
-			this.deque.AddFirst(val)
+			suit.deque.AddFirst(val)
 		}(i)
 	}
 	for i := 0; i < count/2; i++ {
 		t := <-timeoutChan
 		//fmt.Println(t)
 		if t < timeout {
-			this.Fail(fmt.Sprintf("%v timeout %v < 1000", t, i))
+			suit.Fail(fmt.Sprintf("%v timeout %v < 1000", t, i))
 		}
 	}
 	close(timeoutChan)
@@ -417,64 +417,64 @@ func (this *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 		valueset[val] = val
 	}
 	close(ch)
-	this.Equal(count/2, len(valueset))
+	suit.Equal(count/2, len(valueset))
 }
 
-func (this *LinkedBlockDequeTestSuite) TestQueuePutAndPullTimeout() {
-	this.deque = NewDeque(1)
+func (suit *LinkedBlockDequeTestSuite) TestQueuePutAndPullTimeout() {
+	suit.deque = NewDeque(1)
 	ch := make(chan int)
 	timeout := time.Duration(500) * time.Millisecond
 	go func() {
-		ch <- this.NoErrorWithResult(this.deque.PollFirstWithTimeout(timeout)).(int)
+		ch <- suit.NoErrorWithResult(suit.deque.PollFirstWithTimeout(timeout)).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	time.Sleep(time.Duration(100) * time.Millisecond)
 	go func() {
-		this.deque.PutFirst(1)
+		suit.deque.PutFirst(1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
 	close(ch)
-	this.Equal(1, val)
+	suit.Equal(1, val)
 }
 
-func (this *LinkedBlockDequeTestSuite) TestHasTakeWaitersWithTimeout() {
-	this.deque = NewDeque(1)
-	this.False(this.deque.HasTakeWaiters())
+func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaitersWithTimeout() {
+	suit.deque = NewDeque(1)
+	suit.False(suit.deque.HasTakeWaiters())
 	timeout := time.Duration(500) * time.Millisecond
 	ch := make(chan int)
 	go func() {
-		ch <- this.NoErrorWithResult(this.deque.PollFirstWithTimeout(timeout)).(int)
+		ch <- suit.NoErrorWithResult(suit.deque.PollFirstWithTimeout(timeout)).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	time.Sleep(time.Duration(50) * time.Millisecond)
-	this.True(this.deque.HasTakeWaiters())
+	suit.True(suit.deque.HasTakeWaiters())
 	go func() {
-		this.deque.PutFirst(1)
+		suit.deque.PutFirst(1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
 	close(ch)
-	this.Equal(1, val)
-	this.False(this.deque.HasTakeWaiters())
+	suit.Equal(1, val)
+	suit.False(suit.deque.HasTakeWaiters())
 }
 
-func (this *LinkedBlockDequeTestSuite) TestHasTakeWaiters() {
-	this.deque = NewDeque(1)
-	this.False(this.deque.HasTakeWaiters())
+func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaiters() {
+	suit.deque = NewDeque(1)
+	suit.False(suit.deque.HasTakeWaiters())
 	ch := make(chan int)
 	go func() {
-		ch <- this.NoErrorWithResult(this.deque.TakeFirst()).(int)
+		ch <- suit.NoErrorWithResult(suit.deque.TakeFirst()).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	time.Sleep(time.Duration(50) * time.Millisecond)
-	this.True(this.deque.HasTakeWaiters())
+	suit.True(suit.deque.HasTakeWaiters())
 	go func() {
-		this.deque.PutFirst(1)
+		suit.deque.PutFirst(1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
 	close(ch)
-	this.Equal(1, val)
-	this.False(this.deque.HasTakeWaiters())
+	suit.Equal(1, val)
+	suit.False(suit.deque.HasTakeWaiters())
 }

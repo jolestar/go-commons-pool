@@ -79,34 +79,34 @@ func NewPooledObjectFactory(
 		passivate: passivate}
 }
 
-func (this *DefaultPooledObjectFactory) MakeObject() (*PooledObject, error) {
-	return this.make()
+func (f *DefaultPooledObjectFactory) MakeObject() (*PooledObject, error) {
+	return f.make()
 }
 
-func (this *DefaultPooledObjectFactory) DestroyObject(object *PooledObject) error {
-	if this.destroy != nil {
-		return this.destroy(object)
+func (f *DefaultPooledObjectFactory) DestroyObject(object *PooledObject) error {
+	if f.destroy != nil {
+		return f.destroy(object)
 	}
 	return nil
 }
 
-func (this *DefaultPooledObjectFactory) ValidateObject(object *PooledObject) bool {
-	if this.validate != nil {
-		return this.validate(object)
+func (f *DefaultPooledObjectFactory) ValidateObject(object *PooledObject) bool {
+	if f.validate != nil {
+		return f.validate(object)
 	}
 	return true
 }
 
-func (this *DefaultPooledObjectFactory) ActivateObject(object *PooledObject) error {
-	if this.activate != nil {
-		return this.activate(object)
+func (f *DefaultPooledObjectFactory) ActivateObject(object *PooledObject) error {
+	if f.activate != nil {
+		return f.activate(object)
 	}
 	return nil
 }
 
-func (this *DefaultPooledObjectFactory) PassivateObject(object *PooledObject) error {
-	if this.passivate != nil {
-		return this.passivate(object)
+func (f *DefaultPooledObjectFactory) PassivateObject(object *PooledObject) error {
+	if f.passivate != nil {
+		return f.passivate(object)
 	}
 	return nil
 }

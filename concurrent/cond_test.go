@@ -18,24 +18,24 @@ func NewLockTestObject() *LockTestObject {
 	return &LockTestObject{lock: lock, cond: NewTimeoutCond(lock)}
 }
 
-func (this *LockTestObject) lockAndWaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	return this.cond.WaitWithTimeout(timeout)
+func (o *LockTestObject) lockAndWaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	return o.cond.WaitWithTimeout(timeout)
 }
 
-func (this *LockTestObject) lockAndWait() bool {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (o *LockTestObject) lockAndWait() bool {
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	fmt.Println("lockAndWait")
-	return this.cond.Wait()
+	return o.cond.Wait()
 }
 
-func (this *LockTestObject) lockAndNotify() {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (o *LockTestObject) lockAndNotify() {
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	fmt.Println("lockAndNotify")
-	this.cond.Signal()
+	o.cond.Signal()
 }
 
 func TestTimeoutCondWait(t *testing.T) {

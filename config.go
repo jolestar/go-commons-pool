@@ -218,7 +218,7 @@ type EvictionPolicy interface {
 type DefaultEvictionPolicy struct {
 }
 
-func (this *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
+func (p *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
 	idleTime := underTest.GetIdleTimeMillis()
 
 	if (config.IdleSoftEvictTime < idleTime &&

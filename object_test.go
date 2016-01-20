@@ -19,8 +19,8 @@ type TrackedUseObject struct {
 	lastUsed int64
 }
 
-func (this *TrackedUseObject) GetLastUsed() int64 {
-	return this.lastUsed
+func (o *TrackedUseObject) GetLastUsed() int64 {
+	return o.lastUsed
 }
 
 func TestTrackedUse(t *testing.T) {
