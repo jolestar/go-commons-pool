@@ -5,20 +5,27 @@ import (
 	"sync"
 )
 
+// Iterator interface for collection
+// see LinkedBlockDequeIterator
 type Iterator interface {
 	HasNext() bool
 	Next() interface{}
 	Remove()
 }
 
+// SyncIdentityMap is a concurrent safe map
+// use key's pointer as map key
 type SyncIdentityMap struct {
 	sync.RWMutex
 	m map[uintptr]interface{}
 }
 
+// NewSyncMap return a new SyncIdentityMap
 func NewSyncMap() *SyncIdentityMap {
 	return &SyncIdentityMap{m: make(map[uintptr]interface{})}
 }
+
+// Get by key
 func (m *SyncIdentityMap) Get(key interface{}) interface{} {
 	m.RLock()
 	keyPtr := genKey(key)
@@ -32,6 +39,7 @@ func genKey(key interface{}) uintptr {
 	return keyValue.Pointer()
 }
 
+// Put key and value to map
 func (m *SyncIdentityMap) Put(key interface{}, value interface{}) {
 	m.Lock()
 	keyPtr := genKey(key)
@@ -39,6 +47,7 @@ func (m *SyncIdentityMap) Put(key interface{}, value interface{}) {
 	m.Unlock()
 }
 
+// Remove value by key
 func (m *SyncIdentityMap) Remove(key interface{}) {
 	m.Lock()
 	keyPtr := genKey(key)
@@ -46,15 +55,14 @@ func (m *SyncIdentityMap) Remove(key interface{}) {
 	m.Unlock()
 }
 
+// Size return map len, and is concurrent safe
 func (m *SyncIdentityMap) Size() int {
 	m.RLock()
 	defer m.RUnlock()
 	return len(m.m)
 }
 
-/**
- * for support multi thread, just copy all map value to slice
- */
+// Values copy all map's value to slice
 func (m *SyncIdentityMap) Values() []interface{} {
 	m.RLock()
 	defer m.RUnlock()

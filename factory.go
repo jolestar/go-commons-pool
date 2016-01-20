@@ -2,6 +2,7 @@ package pool
 
 import "errors"
 
+// PooledObjectFactory is factory interface for ObjectPool
 type PooledObjectFactory interface {
 
 	/**
@@ -43,6 +44,7 @@ type PooledObjectFactory interface {
 	PassivateObject(object *PooledObject) error
 }
 
+// DefaultPooledObjectFactory is a default PooledObjectFactory impl, support init by func
 type DefaultPooledObjectFactory struct {
 	make      func() (*PooledObject, error)
 	destroy   func(object *PooledObject) error
@@ -51,11 +53,13 @@ type DefaultPooledObjectFactory struct {
 	passivate func(object *PooledObject) error
 }
 
+// NewPooledObjectFactorySimple return a DefaultPooledObjectFactory, only custom MakeObject func
 func NewPooledObjectFactorySimple(
 	create func() (interface{}, error)) PooledObjectFactory {
 	return NewPooledObjectFactory(create, nil, nil, nil, nil)
 }
 
+// NewPooledObjectFactory return a DefaultPooledObjectFactory, init with gaven func.
 func NewPooledObjectFactory(
 	create func() (interface{}, error),
 	destroy func(object *PooledObject) error,
@@ -79,10 +83,12 @@ func NewPooledObjectFactory(
 		passivate: passivate}
 }
 
+// MakeObject see PooledObjectFactory.MakeObject
 func (f *DefaultPooledObjectFactory) MakeObject() (*PooledObject, error) {
 	return f.make()
 }
 
+// DestroyObject see PooledObjectFactory.DestroyObject
 func (f *DefaultPooledObjectFactory) DestroyObject(object *PooledObject) error {
 	if f.destroy != nil {
 		return f.destroy(object)
@@ -90,6 +96,7 @@ func (f *DefaultPooledObjectFactory) DestroyObject(object *PooledObject) error {
 	return nil
 }
 
+// ValidateObject see PooledObjectFactory.ValidateObject
 func (f *DefaultPooledObjectFactory) ValidateObject(object *PooledObject) bool {
 	if f.validate != nil {
 		return f.validate(object)
@@ -97,6 +104,7 @@ func (f *DefaultPooledObjectFactory) ValidateObject(object *PooledObject) bool {
 	return true
 }
 
+// ActivateObject see PooledObjectFactory.ActivateObject
 func (f *DefaultPooledObjectFactory) ActivateObject(object *PooledObject) error {
 	if f.activate != nil {
 		return f.activate(object)
@@ -104,6 +112,7 @@ func (f *DefaultPooledObjectFactory) ActivateObject(object *PooledObject) error 
 	return nil
 }
 
+// PassivateObject see PooledObjectFactory.PassivateObject
 func (f *DefaultPooledObjectFactory) PassivateObject(object *PooledObject) error {
 	if f.passivate != nil {
 		return f.passivate(object)

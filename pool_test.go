@@ -22,7 +22,7 @@ type TestObject struct {
 }
 
 var (
-	debug_test = false
+	debugTest = false
 )
 
 type SimpleFactory struct {
@@ -66,7 +66,7 @@ func (f *SimpleFactory) doWait(latencyMillisecond int64) {
 }
 
 func (f *SimpleFactory) MakeObject() (*PooledObject, error) {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory MakeObject")
 	}
 	if f.exceptionOnMake {
@@ -92,7 +92,7 @@ func (f *SimpleFactory) MakeObject() (*PooledObject, error) {
 }
 
 func (f *SimpleFactory) DestroyObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory DestroyObject")
 	}
 	var waitLatency int64
@@ -114,7 +114,7 @@ func (f *SimpleFactory) DestroyObject(object *PooledObject) error {
 }
 
 func (f *SimpleFactory) ValidateObject(object *PooledObject) bool {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory ValidateObject")
 	}
 	var validate bool
@@ -136,15 +136,14 @@ func (f *SimpleFactory) ValidateObject(object *PooledObject) bool {
 	if validate {
 		if counter%2 == 0 {
 			return evenTest
-		} else {
-			return oddTest
 		}
+		return oddTest
 	}
 	return true
 }
 
 func (f *SimpleFactory) ActivateObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory ActivateObject")
 		defer fmt.Println("factory ActivateObject end")
 	}
@@ -174,7 +173,7 @@ func (f *SimpleFactory) ActivateObject(object *PooledObject) error {
 }
 
 func (f *SimpleFactory) PassivateObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory PassivateObject")
 	}
 	var hurl bool
@@ -222,7 +221,7 @@ func TestPoolTestSuite(t *testing.T) {
 }
 
 func (suit *PoolTestSuite) SetupTest() {
-	suit.makeEmptyPool(DEFAULT_MAX_TOTAL)
+	suit.makeEmptyPool(DefaultMaxTotal)
 }
 
 func (suit *PoolTestSuite) TearDownTest() {
@@ -260,14 +259,14 @@ func (suit *PoolTestSuite) TestBaseAddObject() {
 	suit.pool.Config.MaxTotal = 3
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 	suit.assertEquals(0, suit.pool.GetNumActive())
-	if debug_test {
+	if debugTest {
 		fmt.Println("test AddObject")
 	}
 	suit.pool.AddObject()
 
 	suit.assertEquals(1, suit.pool.GetNumIdle())
 	suit.assertEquals(0, suit.pool.GetNumActive())
-	if debug_test {
+	if debugTest {
 		fmt.Println("test BorrowObject")
 	}
 	obj, err := suit.pool.BorrowObject()
@@ -497,7 +496,7 @@ func (suit *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 
 	borrowTime := <-ch
 	close(ch)
-	if debug_test {
+	if debugTest {
 		fmt.Println("TestWhenExhaustedBlockInterrupt borrowTime:", borrowTime)
 	}
 	suit.True(borrowTime >= 200)
@@ -549,7 +548,7 @@ type TestGoroutineResult struct {
 	postborrow int64
 	postreturn int64
 	ended      int64
-	objectId   interface{}
+	objectID   interface{}
 }
 
 func NewTesGoroutineArgSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestGoroutineArg {
@@ -583,7 +582,7 @@ func goroutineRun(arg *TestGoroutineArg) chan TestGoroutineResult {
 			obj, err := arg.pool.BorrowObject()
 			endBorrow := currentTimeMillis()
 			if err != nil {
-				if debug_test {
+				if debugTest {
 					fmt.Println("borrow error, time:", endBorrow-startBorrow)
 				}
 				result.error = err
@@ -630,7 +629,7 @@ func (suit *PoolTestSuite) TestEvictAddObjects() {
 	ch := goroutineRun(borrower)
 	result := <-ch
 	close(ch)
-	if debug_test {
+	if debugTest {
 		fmt.Printf("TestEvictAddObjects %v error:%v", borrower, result.error)
 	}
 	suit.True(!result.failed)
@@ -654,7 +653,7 @@ func (suit *PoolTestSuite) checkEvict(lifo bool) {
 	Prefill(suit.pool, 5)
 	suit.pool.evict()
 	idle = suit.pool.GetNumIdle()
-	if debug_test {
+	if debugTest {
 		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
 	}
 	suit.factory.evenValid = false
@@ -662,7 +661,7 @@ func (suit *PoolTestSuite) checkEvict(lifo bool) {
 	suit.factory.exceptionOnActivate = true
 	suit.pool.evict()
 	idle = suit.pool.GetNumIdle()
-	if debug_test {
+	if debugTest {
 		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
 	}
 	Prefill(suit.pool, 5)
@@ -670,7 +669,7 @@ func (suit *PoolTestSuite) checkEvict(lifo bool) {
 	suit.factory.exceptionOnPassivate = true
 	suit.pool.evict()
 	idle = suit.pool.GetNumIdle()
-	if debug_test {
+	if debugTest {
 		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
 	}
 	suit.factory.exceptionOnPassivate = false
@@ -679,7 +678,7 @@ func (suit *PoolTestSuite) checkEvict(lifo bool) {
 	time.Sleep(time.Duration(125) * time.Millisecond)
 	suit.pool.evict()
 	idle = suit.pool.GetNumIdle()
-	if debug_test {
+	if debugTest {
 		fmt.Printf("checkEvict lifo:%v idel:%v \n", lifo, idle)
 	}
 	suit.assertEquals(2, suit.pool.GetNumIdle())
@@ -823,7 +822,7 @@ func (suit *PoolTestSuite) TestMaxIdle() {
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 	for i := 0; i < 100; i++ {
 		obj := active[i]
-		if debug_test {
+		if debugTest {
 			fmt.Printf("TestMaxIdle ReturnObject %v \n", obj)
 		}
 		err := suit.pool.ReturnObject(obj)
@@ -1147,7 +1146,7 @@ func (suit *PoolTestSuite) TestEvictionInvalid() {
 		func() (interface{}, error) {
 			return &TestObject{}, nil
 		}, nil, func(object *PooledObject) bool {
-			if debug_test {
+			if debugTest {
 				fmt.Printf("TestEvictionInvalid valid object %v \n", object)
 			}
 			time.Sleep(time.Duration(1000) * time.Millisecond)
@@ -1167,7 +1166,7 @@ func (suit *PoolTestSuite) TestEvictionInvalid() {
 
 	// Run eviction in a separate goroutine
 	go func() {
-		if debug_test {
+		if debugTest {
 			fmt.Println("TestEvictionInvalid evict goroutine.")
 		}
 		suit.pool.evict()
@@ -1217,10 +1216,10 @@ func (suit *PoolTestSuite) TestConcurrentInvalidate() {
 		for i := 0; i < nGoroutines; i++ {
 			go func(pool *ObjectPool, obj *TestObject) {
 				err := pool.InvalidateObject(obj)
-				_, ok := err.(*IllegalStatusErr)
+				_, ok := err.(*IllegalStateErr)
 				if err != nil && !ok {
 					results <- false
-					if debug_test {
+					if debugTest {
 						fmt.Printf("TestConcurrentInvalidate InvalidateObject error:%v, obj: %v \n", err, obj)
 					}
 				} else {
@@ -1322,7 +1321,7 @@ func runTestGoroutines(t *testing.T, numGoroutines int, iterations int, delay in
 		resultChans[i] = goroutineRun(arg)
 	}
 	results := make([]TestGoroutineResult, numGoroutines)
-	failedGoroutines := make([]int, 0)
+	var failedGoroutines []int
 	for i := 0; i < numGoroutines; i++ {
 		result := <-resultChans[i]
 		results[i] = result
@@ -1333,7 +1332,7 @@ func runTestGoroutines(t *testing.T, numGoroutines int, iterations int, delay in
 	}
 	if len(failedGoroutines) > 0 {
 		for _, t := range failedGoroutines {
-			if debug_test {
+			if debugTest {
 				fmt.Printf("Goroutine %v failed %v \n", t, results[t].error)
 			}
 		}
@@ -1447,7 +1446,7 @@ func waitTestGoroutine(pool *ObjectPool, pause int) chan TestGoroutineResult {
 		result := TestGoroutineResult{}
 		result.preborrow = currentTimeMillis()
 		obj, err := pool.BorrowObject()
-		result.objectId = obj
+		result.objectID = obj
 		result.postborrow = currentTimeMillis()
 		if err == nil {
 			sleep(pause)
@@ -1559,7 +1558,7 @@ func (suit *PoolTestSuite) TestMaxWaitMultiGoroutineed() {
 	for i := 0; i < len(resultChans); i++ {
 		resultChans[i] = waitTestGoroutine(suit.pool, holdTime)
 	}
-	var failed int = 0
+	failed := 0
 	results := make([]TestGoroutineResult, len(resultChans))
 	for i := 0; i < len(resultChans); i++ {
 		ch := resultChans[i]
@@ -1570,7 +1569,7 @@ func (suit *PoolTestSuite) TestMaxWaitMultiGoroutineed() {
 			failed++
 		}
 	}
-	if debug_test || len(resultChans)/2 != failed {
+	if debugTest || len(resultChans)/2 != failed {
 		fmt.Println(
 			"MaxWait: ", maxWait,
 			" HoldTime: ", holdTime,
@@ -1584,7 +1583,7 @@ func (suit *PoolTestSuite) TestMaxWaitMultiGoroutineed() {
 				" BorrowTime: ", (result.postborrow - result.preborrow),
 				" PostReturn: ", (result.postreturn - origin),
 				" Ended: ", (result.ended - origin),
-				" ObjId: ", result.objectId)
+				" ObjId: ", result.objectID)
 		}
 	}
 	suit.Equal(len(resultChans)/2, failed, "Expected half the goroutines to fail")
@@ -1691,7 +1690,7 @@ func (suit *PoolTestSuite) TestMultipleReturnOfSameObject() {
 	suit.Equal(1, suit.pool.GetNumIdle())
 
 	err := suit.pool.ReturnObject(obj)
-	_, ok := err.(*IllegalStatusErr)
+	_, ok := err.(*IllegalStateErr)
 	suit.True(ok, "expect IllegalStatusErr, but get %v", reflect.TypeOf(err))
 	suit.Equal(0, suit.pool.GetNumActive())
 	suit.Equal(1, suit.pool.GetNumIdle())
@@ -1812,14 +1811,14 @@ var perf bool
 
 func init() {
 	flag.BoolVar(&perf, "perf", false, "perf")
-	flag.BoolVar(&debug_test, "debug_test", false, "debug_test")
+	flag.BoolVar(&debugTest, "debug_test", false, "debug_test")
 }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	exit := 0
 	if perf {
-		perf_main()
+		perfMain()
 	} else {
 		exit = m.Run()
 	}

@@ -8,24 +8,43 @@ import (
 )
 
 const (
-	DEFAULT_MAX_TOTAL = 8
-	DEFAULT_MAX_IDLE  = 8
-	DEFAULT_MIN_IDLE  = 0
-	DEFAULT_LIFO      = true
-	//DEFAULT_FAIRNESS = false
-	DEFAULT_MAX_WAIT_MILLIS                     = int64(-1)
-	DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS      = int64(1000 * 60 * 30)
-	DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS = int64(math.MaxInt64)
-	DEFAULT_NUM_TESTS_PER_EVICTION_RUN          = 3
-	DEFAULT_TEST_ON_CREATE                      = false
-	DEFAULT_TEST_ON_BORROW                      = false
-	DEFAULT_TEST_ON_RETURN                      = false
-	DEFAULT_TEST_WHILE_IDLE                     = false
-	DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS   = int64(-1)
-	DEFAULT_BLOCK_WHEN_EXHAUSTED                = true
-	DEFAULT_EVICTION_POLICY_NAME                = "github.com/jolestar/go-commons-pool/DefaultEvictionPolicy"
+	// DefaultMaxTotal is the default value of ObjectPoolConfig.MaxTotal
+	DefaultMaxTotal = 8
+	// DefaultMaxIdle is the default value of ObjectPoolConfig.MaxIdle
+	DefaultMaxIdle = 8
+	// DefaultMinIdle is the default value of ObjectPoolConfig.MinIdle
+	DefaultMinIdle = 0
+	// DefaultLifo is the default value of ObjectPoolConfig.Lifo
+	DefaultLifo = true
+
+	// TODO
+	// DEFAULT_FAIRNESS = false
+
+	// DefaultMaxWaitMillis is the default value of ObjectPoolConfig.MaxWaitMillis
+	DefaultMaxWaitMillis = int64(-1)
+	// DefaultMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.MinEvictableIdleTimeMillis
+	DefaultMinEvictableIdleTimeMillis = int64(1000 * 60 * 30)
+	// DefaultSoftMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.SoftMinEvictableIdleTimeMillis
+	DefaultSoftMinEvictableIdleTimeMillis = int64(math.MaxInt64)
+	// DefaultNumTestsPerEvictionRun is the default value of ObjectPoolConfig.NumTestsPerEvictionRun
+	DefaultNumTestsPerEvictionRun = 3
+	// DefaultTestOnCreate is the default value of ObjectPoolConfig.TestOnCreate
+	DefaultTestOnCreate = false
+	// DefaultTestOnBorrow is the default value of ObjectPoolConfig.TestOnBorrow
+	DefaultTestOnBorrow = false
+	// DefaultTestOnReturn is the default value of ObjectPoolConfig.TestOnReturn
+	DefaultTestOnReturn = false
+	// DefaultTestWhileIdle is the default value of ObjectPoolConfig.TestWhileIdle
+	DefaultTestWhileIdle = false
+	// DefaultTimeBetweenEvictionRunsMillis is the default value of ObjectPoolConfig.TimeBetweenEvictionRunsMillis
+	DefaultTimeBetweenEvictionRunsMillis = int64(-1)
+	// DefaultBlockWhenExhausted is the default value of ObjectPoolConfig.BlockWhenExhausted
+	DefaultBlockWhenExhausted = true
+	// DefaultEvictionPolicyName is the default value of ObjectPoolConfig.EvictionPolicyName
+	DefaultEvictionPolicyName = "github.com/jolestar/go-commons-pool/DefaultEvictionPolicy"
 )
 
+// ObjectPoolConfig is ObjectPool config, include cap, block, valid strategy, evict strategy etc.
 type ObjectPoolConfig struct {
 	/**
 	 * Whether the pool has LIFO (last in, first out) behaviour with
@@ -175,25 +194,27 @@ type ObjectPoolConfig struct {
 	TimeBetweenEvictionRunsMillis int64
 }
 
+// NewDefaultPoolConfig return a ObjectPoolConfig instance init with default value.
 func NewDefaultPoolConfig() *ObjectPoolConfig {
 	return &ObjectPoolConfig{
-		Lifo:                           DEFAULT_LIFO,
-		MaxTotal:                       DEFAULT_MAX_TOTAL,
-		MaxIdle:                        DEFAULT_MAX_IDLE,
-		MinIdle:                        DEFAULT_MIN_IDLE,
-		MaxWaitMillis:                  DEFAULT_MAX_WAIT_MILLIS,
-		MinEvictableIdleTimeMillis:     DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS,
-		SoftMinEvictableIdleTimeMillis: DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS,
-		NumTestsPerEvictionRun:         DEFAULT_NUM_TESTS_PER_EVICTION_RUN,
-		EvictionPolicyName:             DEFAULT_EVICTION_POLICY_NAME,
-		TestOnCreate:                   DEFAULT_TEST_ON_CREATE,
-		TestOnBorrow:                   DEFAULT_TEST_ON_BORROW,
-		TestOnReturn:                   DEFAULT_TEST_ON_RETURN,
-		TestWhileIdle:                  DEFAULT_TEST_WHILE_IDLE,
-		TimeBetweenEvictionRunsMillis:  DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS,
-		BlockWhenExhausted:             DEFAULT_BLOCK_WHEN_EXHAUSTED}
+		Lifo:                           DefaultLifo,
+		MaxTotal:                       DefaultMaxTotal,
+		MaxIdle:                        DefaultMaxIdle,
+		MinIdle:                        DefaultMinIdle,
+		MaxWaitMillis:                  DefaultMaxWaitMillis,
+		MinEvictableIdleTimeMillis:     DefaultMinEvictableIdleTimeMillis,
+		SoftMinEvictableIdleTimeMillis: DefaultSoftMinEvictableIdleTimeMillis,
+		NumTestsPerEvictionRun:         DefaultNumTestsPerEvictionRun,
+		EvictionPolicyName:             DefaultEvictionPolicyName,
+		TestOnCreate:                   DefaultTestOnCreate,
+		TestOnBorrow:                   DefaultTestOnBorrow,
+		TestOnReturn:                   DefaultTestOnReturn,
+		TestWhileIdle:                  DefaultTestWhileIdle,
+		TimeBetweenEvictionRunsMillis:  DefaultTimeBetweenEvictionRunsMillis,
+		BlockWhenExhausted:             DefaultBlockWhenExhausted}
 }
 
+// AbandonedConfig ObjectPool abandoned strategy config
 type AbandonedConfig struct {
 	RemoveAbandonedOnBorrow      bool
 	RemoveAbandonedOnMaintenance bool
@@ -201,23 +222,29 @@ type AbandonedConfig struct {
 	RemoveAbandonedTimeout int
 }
 
+// NewDefaultAbandonedConfig return a new AbandonedConfig instance init with default.
 func NewDefaultAbandonedConfig() *AbandonedConfig {
 	return &AbandonedConfig{RemoveAbandonedOnBorrow: false, RemoveAbandonedOnMaintenance: false, RemoveAbandonedTimeout: 300}
 }
 
+// EvictionConfig is config for ObjectPool EvictionPolicy
 type EvictionConfig struct {
 	IdleEvictTime     int64
 	IdleSoftEvictTime int64
 	MinIdle           int
 }
 
+// EvictionPolicy is a interface support custom EvictionPolicy
 type EvictionPolicy interface {
+	// Evict do evict by config
 	Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool
 }
 
+// DefaultEvictionPolicy is a default EvictionPolicy impl
 type DefaultEvictionPolicy struct {
 }
 
+// Evict do evict by config
 func (p *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
 	idleTime := underTest.GetIdleTimeMillis()
 
@@ -234,6 +261,7 @@ var (
 	policies      = make(map[string]EvictionPolicy)
 )
 
+// RegistryEvictionPolicy registry a custom EvictionPolicy with gaven name.
 func RegistryEvictionPolicy(name string, policy EvictionPolicy) {
 	if name == "" || policy == nil {
 		panic(errors.New("invalid argument"))
@@ -244,6 +272,7 @@ func RegistryEvictionPolicy(name string, policy EvictionPolicy) {
 	policiesMutex.Unlock()
 }
 
+// GetEvictionPolicy return a EvictionPolicy by gaven name
 func GetEvictionPolicy(name string) EvictionPolicy {
 	policiesMutex.Lock()
 	defer policiesMutex.Unlock()
@@ -252,5 +281,5 @@ func GetEvictionPolicy(name string) EvictionPolicy {
 }
 
 func init() {
-	RegistryEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME, new(DefaultEvictionPolicy))
+	RegistryEvictionPolicy(DefaultEvictionPolicyName, new(DefaultEvictionPolicy))
 }

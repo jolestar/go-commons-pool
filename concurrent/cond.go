@@ -5,18 +5,20 @@ import (
 	"time"
 )
 
+// TimeoutCond is a sync.Cond  improve for support wait timeout.
 type TimeoutCond struct {
 	L          sync.Locker
 	signal     chan int
 	hasWaiters bool
 }
 
+// NewTimeoutCond return a new TimeoutCond
 func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 	cond := TimeoutCond{L: l, signal: make(chan int, 0)}
 	return &cond
 }
 
-//wait for signal return remain wait time, and is interrupted
+// WaitWithTimeout wait for signal return remain wait time, and is interrupted
 func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
 	cond.setHasWaiters(true)
 	ch := cond.signal
@@ -40,12 +42,12 @@ func (cond *TimeoutCond) setHasWaiters(value bool) {
 	cond.hasWaiters = value
 }
 
-//Queries whether any goroutine are waiting on this condition
+// HasWaiters queries whether any goroutine are waiting on this condition
 func (cond *TimeoutCond) HasWaiters() bool {
 	return cond.hasWaiters
 }
 
-//wait for signal return waiting is interrupted
+// Wait for signal return waiting is interrupted
 func (cond *TimeoutCond) Wait() bool {
 	cond.setHasWaiters(true)
 	//copy signal in lock, avoid data race with Interrupt
@@ -65,6 +67,7 @@ func (cond *TimeoutCond) Signal() {
 	}
 }
 
+// Interrupt goroutine wait on this TimeoutCond
 func (cond *TimeoutCond) Interrupt() {
 	cond.L.Lock()
 	defer cond.L.Unlock()

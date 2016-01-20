@@ -280,7 +280,7 @@ func (suit *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 	endWait.Add(count + 1)
 
 	counts := make(map[int]concurrent.AtomicInteger, count)
-	var hasErr concurrent.AtomicInteger = concurrent.AtomicInteger(0)
+	hasErr := concurrent.AtomicInteger(0)
 	for i := 0; i < count; i++ {
 		go func(idx int) {
 			startWait.Wait()

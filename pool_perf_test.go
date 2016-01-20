@@ -62,7 +62,7 @@ func NewSleepingObjectFactory() *SleepingObjectFactory {
 }
 
 func (f *SleepingObjectFactory) MakeObject() (*PooledObject, error) {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory MakeObject", f.counter.Get())
 	}
 	sleep(500)
@@ -70,7 +70,7 @@ func (f *SleepingObjectFactory) MakeObject() (*PooledObject, error) {
 }
 
 func (f *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory DestroyObject", object)
 	}
 	sleep(250)
@@ -78,7 +78,7 @@ func (f *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
 }
 
 func (f *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory ValidateObject", object)
 	}
 	sleep(30)
@@ -86,7 +86,7 @@ func (f *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
 }
 
 func (f *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory ActivateObject", object)
 		defer fmt.Println("factory ActivateObject end")
 	}
@@ -95,7 +95,7 @@ func (f *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
 }
 
 func (f *SleepingObjectFactory) PassivateObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory PassivateObject", object)
 	}
 	sleep(10)
@@ -112,7 +112,7 @@ type TaskStats struct {
 
 func runOnce(pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
 	taskStats.waiting++
-	if debug_test {
+	if debugTest {
 		fmt.Println("   waiting: ", taskStats.waiting, "   complete: ", taskStats.complete)
 	}
 	bbegin := currentTimeMillis()
@@ -120,7 +120,7 @@ func runOnce(pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
 	bend := currentTimeMillis()
 	taskStats.waiting--
 
-	if debug_test {
+	if debugTest {
 		fmt.Println(
 			"    waiting: ", taskStats.waiting,
 			"   complete: ", taskStats.complete)
@@ -145,7 +145,7 @@ func prefTask(pool *ObjectPool, nrIterations int) chan TaskStats {
 			taskStats.totalBorrowTime += borrowTime
 			taskStats.totalReturnTime += returnTime
 			taskStats.nrSamples++
-			if debug_test {
+			if debugTest {
 				fmt.Println("result ", taskStats.nrSamples, "borrow time: ", borrowTime, "\t"+
 					"return time: ", returnTime, "\t", "waiting: ",
 					taskStats.waiting, "\t", "complete: ",
@@ -157,7 +157,7 @@ func prefTask(pool *ObjectPool, nrIterations int) chan TaskStats {
 	return ch
 }
 
-func perf_run(iterations int, nrThreads int, maxTotal int, maxIdle int) {
+func perfRun(iterations int, nrThreads int, maxTotal int, maxIdle int) {
 	factory := NewSleepingObjectFactory()
 
 	pool := NewObjectPoolWithDefaultConfig(factory)
@@ -194,20 +194,20 @@ func perf_run(iterations int, nrThreads int, maxTotal int, maxIdle int) {
 		aggregate.totalReturnTime/int64(aggregate.nrSamples))
 }
 
-func perf_main() {
+func perfMain() {
 	fmt.Println("Increase threads")
-	perf_run(1, 50, 5, 5)
-	perf_run(1, 100, 5, 5)
-	perf_run(1, 200, 5, 5)
-	perf_run(1, 400, 5, 5)
+	perfRun(1, 50, 5, 5)
+	perfRun(1, 100, 5, 5)
+	perfRun(1, 200, 5, 5)
+	perfRun(1, 400, 5, 5)
 
 	fmt.Println("Increase threads & poolsize")
-	perf_run(1, 50, 5, 5)
-	perf_run(1, 100, 10, 10)
-	perf_run(1, 200, 20, 20)
-	perf_run(1, 400, 40, 40)
+	perfRun(1, 50, 5, 5)
+	perfRun(1, 100, 10, 10)
+	perfRun(1, 200, 20, 20)
+	perfRun(1, 400, 40, 40)
 
 	fmt.Println("Increase maxIdle")
-	perf_run(1, 400, 40, 5)
-	perf_run(1, 400, 40, 40)
+	perfRun(1, 400, 40, 5)
+	perfRun(1, 400, 40, 40)
 }

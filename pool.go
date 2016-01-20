@@ -17,22 +17,27 @@ func (err *baseErr) Error() string {
 	return err.msg
 }
 
-type IllegalStatusErr struct {
+// IllegalStateErr when use pool in a illegal way, return this err
+type IllegalStateErr struct {
 	baseErr
 }
 
-func NewIllegalStatusErr(msg string) *IllegalStatusErr {
-	return &IllegalStatusErr{baseErr{msg}}
+// NewIllegalStateErr return new IllegalStateErr
+func NewIllegalStateErr(msg string) *IllegalStateErr {
+	return &IllegalStateErr{baseErr{msg}}
 }
 
+// NoSuchElementErr when no available object in pool, return this err
 type NoSuchElementErr struct {
 	baseErr
 }
 
+// NewNoSuchElementErr return new NoSuchElementErr
 func NewNoSuchElementErr(msg string) *NoSuchElementErr {
 	return &NoSuchElementErr{baseErr{msg}}
 }
 
+// ObjectPool is a generic object pool
 type ObjectPool struct {
 	AbandonedConfig                  *AbandonedConfig
 	Config                           *ObjectPoolConfig
@@ -50,14 +55,17 @@ type ObjectPool struct {
 	evictionIterator                 collections.Iterator
 }
 
+// NewObjectPool return new ObjectPool, init with PooledObjectFactory and ObjectPoolConfig
 func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
 	return NewObjectPoolWithAbandonedConfig(factory, config, nil)
 }
 
+// NewObjectPoolWithDefaultConfig return new ObjectPool init with PooledObjectFactory and default config
 func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
 	return NewObjectPool(factory, NewDefaultPoolConfig())
 }
 
+// NewObjectPoolWithAbandonedConfig return new ObjectPool init with PooledObjectFactory, ObjectPoolConfig, and AbandonedConfig
 func NewObjectPoolWithAbandonedConfig(factory PooledObjectFactory, config *ObjectPoolConfig, abandonedConfig *AbandonedConfig) *ObjectPool {
 	pool := ObjectPool{factory: factory, Config: config,
 		idleObjects:             collections.NewDeque(math.MaxInt32),
@@ -70,15 +78,15 @@ func NewObjectPoolWithAbandonedConfig(factory PooledObjectFactory, config *Objec
 	return &pool
 }
 
-// Create an object using the PooledObjectFactory factory, passivate it, and then place it in
+// AddObject create an object using the PooledObjectFactory factory, passivate it, and then place it in
 // the idle object pool. AddObject is useful for "pre-loading"
 // a pool with idle objects. (Optional operation).
 func (pool *ObjectPool) AddObject() error {
 	if pool.IsClosed() {
-		return NewIllegalStatusErr("Pool not open")
+		return NewIllegalStateErr("Pool not open")
 	}
 	if pool.factory == nil {
-		return NewIllegalStatusErr("Cannot add objects without a factory.")
+		return NewIllegalStateErr("Cannot add objects without a factory.")
 	}
 	p, e := pool.create()
 	if e != nil {
@@ -99,8 +107,7 @@ func (pool *ObjectPool) addIdleObject(p *PooledObject) {
 	}
 }
 
-//Obtains an instance from pool pool.
-//
+// BorrowObject obtains an instance from pool pool.
 // Instances returned from pool method will have been either newly created
 // with PooledObjectFactory.MakeObject or will be a previously
 // idle object and have been activated with
@@ -113,22 +120,24 @@ func (pool *ObjectPool) BorrowObject() (interface{}, error) {
 	return pool.borrowObject(pool.Config.MaxWaitMillis)
 }
 
-//Return the number of instances currently idle in pool pool. This may be
-//considered an approximation of the number of objects that can be
-//BorrowObject borrowed without creating any new instances.
+// GetNumIdle return the number of instances currently idle in pool pool. This may be
+// considered an approximation of the number of objects that can be
+// BorrowObject borrowed without creating any new instances.
 func (pool *ObjectPool) GetNumIdle() int {
 	return pool.idleObjects.Size()
 }
 
-//Return the number of instances currently borrowed from pool pool.
+// GetNumActive return the number of instances currently borrowed from pool pool.
 func (pool *ObjectPool) GetNumActive() int {
 	return pool.allObjects.Size() - pool.idleObjects.Size()
 }
 
+// GetDestroyedCount return destroyed object count of this pool
 func (pool *ObjectPool) GetDestroyedCount() int {
 	return int(pool.destroyedCount.Get())
 }
 
+// GetDestroyedByBorrowValidationCount return destroyed object count when borrow validation
 func (pool *ObjectPool) GetDestroyedByBorrowValidationCount() int {
 	return int(pool.destroyedByBorrowValidationCount.Get())
 }
@@ -142,7 +151,7 @@ func (pool *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 	for _, o := range objects {
 		pooledObject := o.(*PooledObject)
 		pooledObject.lock.Lock()
-		if pooledObject.state == ALLOCATED &&
+		if pooledObject.state == StateAllocated &&
 			pooledObject.GetLastUsedTime() <= timeout {
 			pooledObject.markAbandoned()
 			remove = append(remove, pooledObject)
@@ -212,7 +221,7 @@ func (pool *ObjectPool) updateStatsReturn(activeTime int64) {
 
 func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, error) {
 	if pool.IsClosed() {
-		return nil, NewIllegalStatusErr("Pool not open")
+		return nil, NewIllegalStateErr("Pool not open")
 	}
 	ac := pool.AbandonedConfig
 	if ac != nil && ac.RemoveAbandonedOnBorrow &&
@@ -343,6 +352,7 @@ func (pool *ObjectPool) ensureIdle(idleCount int, always bool) {
 	}
 }
 
+// IsClosed return this pool is closed
 func (pool *ObjectPool) IsClosed() bool {
 	pool.closeLock.Lock()
 	defer pool.closeLock.Unlock()
@@ -350,17 +360,17 @@ func (pool *ObjectPool) IsClosed() bool {
 	return pool.closed
 }
 
-// Return an instance to the pool. By contract, object
+// ReturnObject return an instance to the pool. By contract, object
 // must have been obtained using BorrowObject()
 func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	if object == nil {
-		return errors.New("object is nil.")
+		return errors.New("object is nil")
 	}
 	p, ok := pool.allObjects.Get(object).(*PooledObject)
 
 	if !ok {
 		if !pool.isAbandonedConfig() {
-			return NewIllegalStatusErr(
+			return NewIllegalStateErr(
 				"Returned object not currently part of pool pool")
 		}
 		return nil // Object was abandoned and removed
@@ -368,9 +378,9 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	p.lock.Lock()
 
 	state := p.state
-	if state != ALLOCATED {
+	if state != StateAllocated {
 		p.lock.Unlock()
-		return NewIllegalStatusErr(
+		return NewIllegalStateErr(
 			"Object has already been returned to pool pool or is invalid")
 	}
 	//use unlock method markReturning() not MarkReturning
@@ -400,7 +410,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	}
 
 	if !p.Deallocate() {
-		return NewIllegalStatusErr("Object has already been returned to pool pool or is invalid")
+		return NewIllegalStateErr("Object has already been returned to pool pool or is invalid")
 	}
 
 	maxIdleSave := pool.Config.MaxIdle
@@ -423,9 +433,9 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	return nil
 }
 
-//Clears any objects sitting idle in the pool, releasing any associated
-//resources (optional operation). Idle objects cleared must be
-//PooledObjectFactory.DestroyObject(PooledObject) .
+// Clear clears any objects sitting idle in the pool, releasing any associated
+// resources (optional operation). Idle objects cleared must be
+// PooledObjectFactory.DestroyObject(PooledObject) .
 func (pool *ObjectPool) Clear() {
 	p, ok := pool.idleObjects.PollFirst().(*PooledObject)
 
@@ -435,11 +445,9 @@ func (pool *ObjectPool) Clear() {
 	}
 }
 
-// Invalidates an object from the pool.
-//
+// InvalidateObject invalidates an object from the pool.
 // By contract, object must have been obtained
 // using BorrowObject.
-//
 // This method should be used when an object that has been borrowed is
 // determined (due to an exception or other problem) to be invalid.
 func (pool *ObjectPool) InvalidateObject(object interface{}) error {
@@ -447,13 +455,12 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 	if !ok {
 		if pool.isAbandonedConfig() {
 			return nil
-		} else {
-			return NewIllegalStatusErr(
-				"Invalidated object not currently part of pool pool")
 		}
+		return NewIllegalStateErr(
+			"Invalidated object not currently part of pool pool")
 	}
 	p.lock.Lock()
-	if p.state != INVALID {
+	if p.state != StateInvalid {
 		pool.doDestroy(p, true)
 	}
 	p.lock.Unlock()
@@ -461,7 +468,7 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 	return nil
 }
 
-//Close pool pool, and free any resources associated with it.
+// Close pool pool, and free any resources associated with it.
 func (pool *ObjectPool) Close() {
 	if pool.IsClosed() {
 		return
@@ -484,7 +491,8 @@ func (pool *ObjectPool) Close() {
 	pool.idleObjects.InterruptTakeWaiters()
 }
 
-//if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call pool method to let it to take effect.
+// StartEvictor start background evictor goroutine, pool.Config.TimeBetweenEvictionRunsMillis must a positive number.
+// if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call pool method to let it to take effect.
 func (pool *ObjectPool) StartEvictor() {
 	pool.startEvictor(pool.Config.TimeBetweenEvictionRunsMillis)
 }
@@ -511,7 +519,7 @@ func (pool *ObjectPool) startEvictor(delay int64) {
 func (pool *ObjectPool) getEvictionPolicy() EvictionPolicy {
 	evictionPolicy := GetEvictionPolicy(pool.Config.EvictionPolicyName)
 	if evictionPolicy == nil {
-		evictionPolicy = GetEvictionPolicy(DEFAULT_EVICTION_POLICY_NAME)
+		evictionPolicy = GetEvictionPolicy(DefaultEvictionPolicyName)
 	}
 	return evictionPolicy
 }
@@ -521,19 +529,18 @@ func (pool *ObjectPool) getNumTests() int {
 	if numTestsPerEvictionRun >= 0 {
 		if numTestsPerEvictionRun < pool.idleObjects.Size() {
 			return numTestsPerEvictionRun
-		} else {
-			return pool.idleObjects.Size()
 		}
+		return pool.idleObjects.Size()
 	}
 	return int((math.Ceil(float64(pool.idleObjects.Size()) / math.Abs(float64(numTestsPerEvictionRun)))))
 }
 
-func (pool *ObjectPool) EvictionIterator() collections.Iterator {
+// idleIterator return pool idleObjects iterator
+func (pool *ObjectPool) idleIterator() collections.Iterator {
 	if pool.Config.Lifo {
 		return pool.idleObjects.DescendingIterator()
-	} else {
-		return pool.idleObjects.Iterator()
 	}
+	return pool.idleObjects.Iterator()
 }
 
 func (pool *ObjectPool) getMinIdle() int {
@@ -568,7 +575,7 @@ func (pool *ObjectPool) evict() {
 	testWhileIdle := pool.Config.TestWhileIdle
 	for i, m := 0, pool.getNumTests(); i < m; i++ {
 		if pool.evictionIterator == nil || !pool.evictionIterator.HasNext() {
-			pool.evictionIterator = pool.EvictionIterator()
+			pool.evictionIterator = pool.idleIterator()
 		}
 		if !pool.evictionIterator.HasNext() {
 			// Pool exhausted, nothing to do here
@@ -601,7 +608,7 @@ func (pool *ObjectPool) evict() {
 			pool.destroy(underTest)
 			pool.destroyedByEvictorCount.IncrementAndGet()
 		} else {
-			var active bool = false
+			active := false
 			if testWhileIdle {
 				err := pool.factory.ActivateObject(underTest)
 				if err == nil {
@@ -636,8 +643,8 @@ func (pool *ObjectPool) ensureMinIdle() {
 	pool.ensureIdle(pool.getMinIdle(), true)
 }
 
-//Tries to ensure that {@link #getMinIdle()} idle instances are available
-//in the pool.
+// PreparePool Tries to ensure that {@link #getMinIdle()} idle instances are available
+// in the pool.
 func (pool *ObjectPool) PreparePool() {
 	if pool.getMinIdle() < 1 {
 		return
@@ -645,6 +652,7 @@ func (pool *ObjectPool) PreparePool() {
 	pool.ensureMinIdle()
 }
 
+// Prefill is util func for pre fill pool object
 func Prefill(pool *ObjectPool, count int) {
 	for i := 0; i < count; i++ {
 		pool.AddObject()

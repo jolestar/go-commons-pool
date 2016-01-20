@@ -42,7 +42,8 @@ func (o *AbandonedTestObject) hashCode() int {
 
 func TestAbandonedTestObject(t *testing.T) {
 	obj := NewAbandonedTestObject()
-	var trackedUse TrackedUse = obj
+	var trackedUse TrackedUse
+	trackedUse = obj
 	assert.Equal(t, int64(0), trackedUse.GetLastUsed())
 }
 
@@ -61,7 +62,7 @@ func (f *SimpleAbandonedFactory) doWait(latencyMillisecond int64) {
 }
 
 func (f *SimpleAbandonedFactory) MakeObject() (*PooledObject, error) {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory MakeObject")
 	}
 	object := NewAbandonedTestObject()
@@ -70,7 +71,7 @@ func (f *SimpleAbandonedFactory) MakeObject() (*PooledObject, error) {
 }
 
 func (f *SimpleAbandonedFactory) DestroyObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory DestroyObject")
 	}
 	object.Object.(*AbandonedTestObject).active = false
@@ -85,7 +86,7 @@ func (f *SimpleAbandonedFactory) DestroyObject(object *PooledObject) error {
 }
 
 func (f *SimpleAbandonedFactory) ValidateObject(object *PooledObject) bool {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory ValidateObject")
 	}
 	f.doWait(f.validateLatency)
@@ -93,7 +94,7 @@ func (f *SimpleAbandonedFactory) ValidateObject(object *PooledObject) bool {
 }
 
 func (f *SimpleAbandonedFactory) ActivateObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory ActivateObject")
 		defer fmt.Println("factory ActivateObject end")
 	}
@@ -102,7 +103,7 @@ func (f *SimpleAbandonedFactory) ActivateObject(object *PooledObject) error {
 }
 
 func (f *SimpleAbandonedFactory) PassivateObject(object *PooledObject) error {
-	if debug_test {
+	if debugTest {
 		fmt.Println("factory PassivateObject")
 	}
 	object.Object.(*AbandonedTestObject).active = false
@@ -175,14 +176,14 @@ func concurrentReturner(pool *ObjectPool, object *AbandonedTestObject, wait *syn
  * in GenericObjectPool
  */
 func (suit *PoolAbandonedTestSuite) TestConcurrentInvalidation() {
-	POOL_SIZE := 30
-	suit.pool.Config.MaxTotal = POOL_SIZE
-	suit.pool.Config.MaxIdle = POOL_SIZE
+	poolSize := 30
+	suit.pool.Config.MaxTotal = poolSize
+	suit.pool.Config.MaxIdle = poolSize
 	suit.pool.Config.BlockWhenExhausted = false
 
 	// Exhaust the connection pool
-	vec := make([]*AbandonedTestObject, POOL_SIZE)
-	for i := 0; i < POOL_SIZE; i++ {
+	vec := make([]*AbandonedTestObject, poolSize)
+	for i := 0; i < poolSize; i++ {
 		vec[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*AbandonedTestObject)
 	}
 
@@ -192,12 +193,12 @@ func (suit *PoolAbandonedTestSuite) TestConcurrentInvalidation() {
 	}
 
 	// Try launching a bunch of borrows concurrently.  Abandoned sweep will be triggered for each.
-	CONCURRENT_BORROWS := 5
+	concurrentBorrows := 5
 
-	objects := make(chan *AbandonedTestObject, POOL_SIZE)
+	objects := make(chan *AbandonedTestObject, poolSize)
 	wait := sync.WaitGroup{}
-	wait.Add(CONCURRENT_BORROWS)
-	for i := 0; i < CONCURRENT_BORROWS; i++ {
+	wait.Add(concurrentBorrows)
+	for i := 0; i < concurrentBorrows; i++ {
 		concurrentBorrower(suit.pool, objects, &wait)
 	}
 
@@ -244,7 +245,7 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedReturn() {
 	wait := new(sync.WaitGroup)
 	wait.Add(1)
 	deadMansHash := obj.hashCode()
-	if debug_test {
+	if debugTest {
 		fmt.Println("deadMansHash:", deadMansHash)
 	}
 	concurrentReturner(suit.pool, obj, wait)

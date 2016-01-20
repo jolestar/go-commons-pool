@@ -7,9 +7,11 @@ import (
 	"time"
 )
 
+// InterruptedErr when deque block method bean interrupted will return this err
 type InterruptedErr struct {
 }
 
+// NewInterruptedErr return new error instance
 func NewInterruptedErr() *InterruptedErr {
 	return &InterruptedErr{}
 }
@@ -18,6 +20,7 @@ func (err *InterruptedErr) Error() string {
 	return "Interrupted"
 }
 
+// Node is LinkedBlockingDeque's element
 type Node struct {
 
 	//The item, or nil if this node has been removed.
@@ -36,10 +39,11 @@ type Node struct {
 	next *Node
 }
 
-func NewNode(item interface{}, prev *Node, next *Node) *Node {
+func newNode(item interface{}, prev *Node, next *Node) *Node {
 	return &Node{item: item, prev: prev, next: next}
 }
 
+// LinkedBlockingDeque is a concurrent safe blocking deque
 type LinkedBlockingDeque struct {
 
 	//Pointer to first node.
@@ -68,6 +72,7 @@ type LinkedBlockingDeque struct {
 	notFull *concurrent.TimeoutCond
 }
 
+// NewDeque return a LinkedBlockingDeque with init capacity
 func NewDeque(capacity int) *LinkedBlockingDeque {
 	if capacity < 0 {
 		panic(errors.New("capacity must > 0"))
@@ -83,7 +88,7 @@ func (q *LinkedBlockingDeque) linkFirst(e interface{}) bool {
 		return false
 	}
 	f := q.first
-	x := NewNode(e, nil, f)
+	x := newNode(e, nil, f)
 	q.first = x
 	if q.last == nil {
 		q.last = x
@@ -103,7 +108,7 @@ func (q *LinkedBlockingDeque) linkLast(e interface{}) bool {
 		return false
 	}
 	l := q.last
-	x := NewNode(e, l, nil)
+	x := newNode(e, l, nil)
 	q.last = x
 	if q.first == nil {
 		q.first = x
@@ -158,7 +163,7 @@ func (q *LinkedBlockingDeque) unlinkLast() interface{} {
 	return item
 }
 
-//Unlinks the provided node.
+//Unlink the provided node.
 func (q *LinkedBlockingDeque) unlink(x *Node) {
 	// assert lock.isHeldByCurrentThread();
 	p := x.prev
@@ -178,9 +183,9 @@ func (q *LinkedBlockingDeque) unlink(x *Node) {
 	}
 }
 
-//Inserts the specified element at the front of this deque if it is
-//possible to do so immediately without violating capacity restrictions,
-//return error if no space is currently available.
+// AddFirst inserts the specified element at the front of this deque if it is
+// possible to do so immediately without violating capacity restrictions,
+// return error if no space is currently available.
 func (q *LinkedBlockingDeque) AddFirst(e interface{}) error {
 	if e == nil {
 		return errors.New("e is nil")
@@ -191,9 +196,9 @@ func (q *LinkedBlockingDeque) AddFirst(e interface{}) error {
 	return nil
 }
 
-//Inserts the specified element at the end of this deque if it is
-//possible to do so immediately without violating capacity restrictions,
-//return error if no space is currently available.
+// AddLast inserts the specified element at the end of this deque if it is
+// possible to do so immediately without violating capacity restrictions,
+// return error if no space is currently available.
 func (q *LinkedBlockingDeque) AddLast(e interface{}) error {
 	if e == nil {
 		return errors.New("e is nil")
@@ -204,9 +209,8 @@ func (q *LinkedBlockingDeque) AddLast(e interface{}) error {
 	return nil
 }
 
-//Inserts the specified element at the front of this deque unless it would
-//violate capacity restrictions.
-//return if the element was added to this deque
+// OfferFirst inserts the specified element at the front of this deque unless it would violate capacity restrictions.
+// return if the element was added to this deque
 func (q *LinkedBlockingDeque) OfferFirst(e interface{}) bool {
 	if e == nil {
 		return false
@@ -217,9 +221,8 @@ func (q *LinkedBlockingDeque) OfferFirst(e interface{}) bool {
 	return result
 }
 
-//Inserts the specified element at the end of this deque unless it would
-//violate capacity restrictions.
-//return if the element was added to this deque
+// OfferLast inserts the specified element at the end of this deque unless it would violate capacity restrictions.
+// return if the element was added to this deque
 func (q *LinkedBlockingDeque) OfferLast(e interface{}) bool {
 	if e == nil {
 		return false
@@ -230,8 +233,8 @@ func (q *LinkedBlockingDeque) OfferLast(e interface{}) bool {
 	return result
 }
 
-//Links the provided element as the first in the queue, waiting until there
-//is space to do so if the queue is full.
+// PutFirst link the provided element as the first in the queue, waiting until there
+// is space to do so if the queue is full.
 func (q *LinkedBlockingDeque) PutFirst(e interface{}) {
 	if e == nil {
 		return
@@ -243,7 +246,7 @@ func (q *LinkedBlockingDeque) PutFirst(e interface{}) {
 	}
 }
 
-// Links the provided element as the last in the queue, waiting until there
+// PutLast Link the provided element as the last in the queue, waiting until there
 // is space to do so if the queue is full.
 func (q *LinkedBlockingDeque) PutLast(e interface{}) {
 	if e == nil {
@@ -256,8 +259,8 @@ func (q *LinkedBlockingDeque) PutLast(e interface{}) {
 	}
 }
 
-//Retrieves and removes the first element of this deque,
-//or returns nil if this deque is empty.
+// PollFirst retrieves and removes the first element of this deque,
+// or returns nil if this deque is empty.
 func (q *LinkedBlockingDeque) PollFirst() (e interface{}) {
 	q.lock.Lock()
 	result := q.unlinkFirst()
@@ -265,9 +268,9 @@ func (q *LinkedBlockingDeque) PollFirst() (e interface{}) {
 	return result
 }
 
-//Retrieves and removes the first element of this deque, waiting
-//up to the specified wait time if necessary for an element to become available.
-//return NewInterruptedErr when waiting bean interrupted
+// PollFirstWithTimeout retrieves and removes the first element of this deque, waiting
+// up to the specified wait time if necessary for an element to become available.
+// return NewInterruptedErr when waiting bean interrupted
 func (q *LinkedBlockingDeque) PollFirstWithTimeout(timeout time.Duration) (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -285,8 +288,8 @@ func (q *LinkedBlockingDeque) PollFirstWithTimeout(timeout time.Duration) (inter
 	return x, nil
 }
 
-//Retrieves and removes the last element of this deque,
-//or returns nil if this deque is empty.
+// PollLast retrieves and removes the last element of this deque,
+// or returns nil if this deque is empty.
 func (q *LinkedBlockingDeque) PollLast() interface{} {
 	q.lock.Lock()
 	result := q.unlinkLast()
@@ -294,9 +297,9 @@ func (q *LinkedBlockingDeque) PollLast() interface{} {
 	return result
 }
 
-//Retrieves and removes the last element of this deque, waiting
-//up to the specified wait time if necessary for an element to become available.
-//return NewInterruptedErr when waiting bean interrupted
+// PollLastWithTimeout retrieves and removes the last element of this deque, waiting
+// up to the specified wait time if necessary for an element to become available.
+// return NewInterruptedErr when waiting bean interrupted
 func (q *LinkedBlockingDeque) PollLastWithTimeout(timeout time.Duration) (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -314,9 +317,9 @@ func (q *LinkedBlockingDeque) PollLastWithTimeout(timeout time.Duration) (interf
 	return x, nil
 }
 
-//Unlinks the first element in the queue, waiting until there is an element
-//to unlink if the queue is empty.
-//return NewInterruptedErr if wait condition is interrupted
+// TakeFirst unlink the first element in the queue, waiting until there is an element
+// to unlink if the queue is empty.
+// return NewInterruptedErr if wait condition is interrupted
 func (q *LinkedBlockingDeque) TakeFirst() (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -331,9 +334,9 @@ func (q *LinkedBlockingDeque) TakeFirst() (interface{}, error) {
 	return x, nil
 }
 
-//Unlinks the last element in the queue, waiting until there is an element
-//to unlink if the queue is empty.
-//return NewInterruptedErr if wait condition is interrupted
+// TakeLast unlink the last element in the queue, waiting until there is an element
+// to unlink if the queue is empty.
+// return NewInterruptedErr if wait condition is interrupted
 func (q *LinkedBlockingDeque) TakeLast() (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -348,8 +351,8 @@ func (q *LinkedBlockingDeque) TakeLast() (interface{}, error) {
 	return x, nil
 }
 
-//Retrieves, but does not remove, the first element of this deque,
-//or returns nil if this deque is empty.
+// PeekFirst retrieves, but does not remove, the first element of this deque,
+// or returns nil if this deque is empty.
 func (q *LinkedBlockingDeque) PeekFirst() interface{} {
 	var result interface{}
 	q.lock.Lock()
@@ -362,8 +365,8 @@ func (q *LinkedBlockingDeque) PeekFirst() interface{} {
 	return result
 }
 
-//Retrieves, but does not remove, the last element of this deque,
-//or returns nil if this deque is empty.
+// PeekLast retrieves, but does not remove, the last element of this deque,
+// or returns nil if this deque is empty.
 func (q *LinkedBlockingDeque) PeekLast() interface{} {
 	var result interface{}
 	q.lock.Lock()
@@ -376,13 +379,13 @@ func (q *LinkedBlockingDeque) PeekLast() interface{} {
 	return result
 }
 
-//Removes the first occurrence of the specified element from this deque.
-//If the deque does not contain the element, it is unchanged.
-//More formally, removes the first element item such that
+// RemoveFirstOccurrence removes the first occurrence of the specified element from this deque.
+// If the deque does not contain the element, it is unchanged.
+// More formally, removes the first element item such that
 //		o == item
-//(if such an element exists).
-//Returns true if this deque contained the specified element
-//(or equivalently, if this deque changed as a result of the call).
+// (if such an element exists).
+// Returns true if this deque contained the specified element
+// (or equivalently, if this deque changed as a result of the call).
 func (q *LinkedBlockingDeque) RemoveFirstOccurrence(item interface{}) bool {
 	if item == nil {
 		return false
@@ -398,13 +401,13 @@ func (q *LinkedBlockingDeque) RemoveFirstOccurrence(item interface{}) bool {
 	return false
 }
 
-//Removes the last occurrence of the specified element from this deque.
-//If the deque does not contain the element, it is unchanged.
-//More formally, removes the last element item such that
+// RemoveLastOccurrence removes the last occurrence of the specified element from this deque.
+// If the deque does not contain the element, it is unchanged.
+// More formally, removes the last element item such that
 //		o == item
-//(if such an element exists).
-//Returns true if this deque contained the specified element
-//(or equivalently, if this deque changed as a result of the call).
+// (if such an element exists).
+// Returns true if this deque contained the specified element
+// (or equivalently, if this deque changed as a result of the call).
 func (q *LinkedBlockingDeque) RemoveLastOccurrence(item interface{}) bool {
 	if item == nil {
 		return false
@@ -420,21 +423,21 @@ func (q *LinkedBlockingDeque) RemoveLastOccurrence(item interface{}) bool {
 	return false
 }
 
-//Interrupts the goroutine currently waiting to take an object from the pool.
+// InterruptTakeWaiters interrupts the goroutine currently waiting to take an object from the pool.
 func (q *LinkedBlockingDeque) InterruptTakeWaiters() {
 	q.notEmpty.Interrupt()
 }
 
-//Returns true if there are goroutine waiting to take instances from this deque.
-//See disclaimer on accuracy in  TimeoutCond.HasWaiters()
+// HasTakeWaiters returns true if there are goroutine waiting to take instances from this deque.
+// See disclaimer on accuracy in  TimeoutCond.HasWaiters()
 func (q *LinkedBlockingDeque) HasTakeWaiters() bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	return q.notEmpty.HasWaiters()
 }
 
-//Returns an slice containing all of the elements in this deque, in
-//proper sequence (from first to last element).
+// ToSlice returns an slice containing all of the elements in this deque, in
+// proper sequence (from first to last element).
 func (q *LinkedBlockingDeque) ToSlice() []interface{} {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -445,6 +448,7 @@ func (q *LinkedBlockingDeque) ToSlice() []interface{} {
 	return a
 }
 
+// Size return this LinkedBlockingDeque current elements len, is concurrent safe
 func (q *LinkedBlockingDeque) Size() int {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -455,18 +459,20 @@ func (q *LinkedBlockingDeque) size() int {
 	return q.count
 }
 
-func (q *LinkedBlockingDeque) Iterator() *LinkedBlockDequeIterator {
-	return NewIterator(q, false)
+// Iterator return a asc iterator of this deque
+func (q *LinkedBlockingDeque) Iterator() Iterator {
+	return newIterator(q, false)
 }
 
-func (q *LinkedBlockingDeque) DescendingIterator() *LinkedBlockDequeIterator {
-	return NewIterator(q, true)
+// DescendingIterator return a desc iterator of this deque
+func (q *LinkedBlockingDeque) DescendingIterator() Iterator {
+	return newIterator(q, true)
 }
 
-func NewIterator(q *LinkedBlockingDeque, desc bool) *LinkedBlockDequeIterator {
+func newIterator(q *LinkedBlockingDeque, desc bool) *LinkedBlockingDequeIterator {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	iterator := LinkedBlockDequeIterator{q: q, desc: desc}
+	iterator := LinkedBlockingDequeIterator{q: q, desc: desc}
 	iterator.next = iterator.firstNode()
 	if iterator.next == nil {
 		iterator.nextItem = nil
@@ -476,7 +482,8 @@ func NewIterator(q *LinkedBlockingDeque, desc bool) *LinkedBlockDequeIterator {
 	return &iterator
 }
 
-type LinkedBlockDequeIterator struct {
+// LinkedBlockingDequeIterator is iterator implements for LinkedBlockingDeque
+type LinkedBlockingDequeIterator struct {
 	q        *LinkedBlockingDeque
 	next     *Node
 	nextItem interface{}
@@ -484,27 +491,27 @@ type LinkedBlockDequeIterator struct {
 	desc     bool
 }
 
-func (iterator *LinkedBlockDequeIterator) firstNode() *Node {
-	if !iterator.desc {
-		return iterator.q.first
-	} else {
+func (iterator *LinkedBlockingDequeIterator) firstNode() *Node {
+	if iterator.desc {
 		return iterator.q.last
 	}
+	return iterator.q.first
 }
 
-func (iterator *LinkedBlockDequeIterator) nextNode(node *Node) *Node {
-	if !iterator.desc {
-		return node.next
-	} else {
+func (iterator *LinkedBlockingDequeIterator) nextNode(node *Node) *Node {
+	if iterator.desc {
 		return node.prev
 	}
+	return node.next
 }
 
-func (iterator *LinkedBlockDequeIterator) HasNext() bool {
+// HasNext return is exist next element
+func (iterator *LinkedBlockingDequeIterator) HasNext() bool {
 	return iterator.next != nil
 }
 
-func (iterator *LinkedBlockDequeIterator) Next() interface{} {
+// Next return next element, if not exist will return nil
+func (iterator *LinkedBlockingDequeIterator) Next() interface{} {
 	if iterator.next == nil {
 		//TODO error or nil ?
 		//panic(errors.New("NoSuchElement"))
@@ -516,7 +523,7 @@ func (iterator *LinkedBlockDequeIterator) Next() interface{} {
 	return x
 }
 
-func (iterator *LinkedBlockDequeIterator) advance() {
+func (iterator *LinkedBlockingDequeIterator) advance() {
 	lock := iterator.q.lock
 	lock.Lock()
 	defer lock.Unlock()
@@ -528,7 +535,7 @@ func (iterator *LinkedBlockDequeIterator) advance() {
 	}
 }
 
-func (iterator *LinkedBlockDequeIterator) succ(n *Node) *Node {
+func (iterator *LinkedBlockingDequeIterator) succ(n *Node) *Node {
 	for {
 		s := iterator.nextNode(n)
 		if s == nil {
@@ -537,13 +544,13 @@ func (iterator *LinkedBlockDequeIterator) succ(n *Node) *Node {
 			return s
 		} else if s == n {
 			return iterator.firstNode()
-		} else {
-			n = s
 		}
+		n = s
 	}
 }
 
-func (iterator *LinkedBlockDequeIterator) Remove() {
+// Remove current element from dequeue
+func (iterator *LinkedBlockingDequeIterator) Remove() {
 	n := iterator.lastRet
 	if n == nil {
 		panic(errors.New("IllegalStateException"))
