@@ -508,7 +508,7 @@ func (pool *ObjectPool) startEvictor(delay int64) {
 	if delay > 0 {
 		pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
 		go func() {
-			for _ = range pool.evictor.C {
+			for range pool.evictor.C {
 				pool.evict()
 				pool.ensureMinIdle()
 			}
