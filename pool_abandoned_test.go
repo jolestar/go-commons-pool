@@ -11,10 +11,17 @@ import (
 )
 
 type AbandonedTestObject struct {
+	lock       sync.Mutex
 	active     bool
 	destroyed  bool
 	_hash      int
 	_abandoned bool
+}
+
+func (o *AbandonedTestObject) setActive(active bool) {
+	o.lock.Lock()
+	o.active = active
+	o.lock.Unlock()
 }
 
 func NewAbandonedTestObject() *AbandonedTestObject {
@@ -33,7 +40,9 @@ func (o *AbandonedTestObject) GetLastUsed() int64 {
 }
 
 func (o *AbandonedTestObject) destroy() {
+	o.lock.Lock()
 	o.destroyed = true
+	o.lock.Unlock()
 }
 
 func (o *AbandonedTestObject) hashCode() int {
@@ -74,7 +83,7 @@ func (f *SimpleAbandonedFactory) DestroyObject(object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory DestroyObject")
 	}
-	object.Object.(*AbandonedTestObject).active = false
+	object.Object.(*AbandonedTestObject).setActive(false)
 	// while destroying instances, yield control to other threads
 	// helps simulate threading errors
 	//Thread.yield();
@@ -98,7 +107,7 @@ func (f *SimpleAbandonedFactory) ActivateObject(object *PooledObject) error {
 		fmt.Println("factory ActivateObject")
 		defer fmt.Println("factory ActivateObject end")
 	}
-	object.Object.(*AbandonedTestObject).active = true
+	object.Object.(*AbandonedTestObject).setActive(true)
 	return nil
 }
 
@@ -106,7 +115,7 @@ func (f *SimpleAbandonedFactory) PassivateObject(object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory PassivateObject")
 	}
-	object.Object.(*AbandonedTestObject).active = false
+	object.Object.(*AbandonedTestObject).setActive(false)
 	return nil
 }
 
