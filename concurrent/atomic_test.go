@@ -64,7 +64,7 @@ func TestAtomicConcurrentDecrement(t *testing.T) {
 	assert.Equal(t, int32(0), integer.Get())
 }
 
-func TestAtomicConcurrentIncrementAndDecrement(t *testing.T) {
+func TestAtomicConcurrentIncrementAndDecrementAndGet(t *testing.T) {
 	count := 100
 	integer := AtomicInteger(0)
 	wait := sync.WaitGroup{}
@@ -79,6 +79,31 @@ func TestAtomicConcurrentIncrementAndDecrement(t *testing.T) {
 			} else {
 				integer.DecrementAndGet()
 			}
+			integer.Get()
+			wait.Done()
+		}(i)
+	}
+	start.Done()
+	wait.Wait()
+	assert.Equal(t, int32(0), integer.Get())
+}
+
+func TestAtomicConcurrentGetAndIncrementAndDecrement(t *testing.T) {
+	count := 100
+	integer := AtomicInteger(0)
+	wait := sync.WaitGroup{}
+	wait.Add(count)
+	start := sync.WaitGroup{}
+	start.Add(1)
+	for i := 0; i < count; i++ {
+		go func(idx int) {
+			start.Wait()
+			if idx%2 == 0 {
+				integer.GetAndIncrement()
+			} else {
+				integer.GetAndDecrement()
+			}
+			integer.Get()
 			wait.Done()
 		}(i)
 	}
