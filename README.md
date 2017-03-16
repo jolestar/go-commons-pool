@@ -45,14 +45,15 @@ Configuration option table, more detail description see [ObjectPoolConfig](https
 
 Usage
 -------
+    import "github.com/jolestar/go-commons-pool"
 
     //use create func
-    pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+    p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
     		func() (interface{}, error) {
     			return &MyPoolObject{}, nil
     		}))
-    obj, _ := pool.BorrowObject()
-    pool.ReturnObject(obj)
+    obj, _ := p.BorrowObject()
+    p.ReturnObject(obj)
     	
     //use custom Object factory
     
@@ -83,10 +84,10 @@ Usage
     	return nil
     }
     
-    pool := NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
-    pool.Config.MaxTotal = 100
-    obj, _ := pool.BorrowObject()
-    pool.ReturnObject(obj)
+    p := pool.NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
+    p.Config.MaxTotal = 100
+    obj, _ := p.BorrowObject()
+    p.ReturnObject(obj)
 
 more example please see pool_test.go and example_test.go
 
@@ -95,16 +96,16 @@ Note
 PooledObjectFactory.MakeObject must return a pointer, not value.
 The following code will complain error. 
 
-	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+	p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
 		func() (interface{}, error) {
 			return "hello", nil
 		}))
-	obj, _ := pool.BorrowObject()
-	pool.ReturnObject(obj)
+	obj, _ := p.BorrowObject()
+	p.ReturnObject(obj)
 
 The right way is:
 
-	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+	p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
 		func() (interface{}, error) {
 			var stringPointer = new(string)
 			*stringPointer = "hello"
@@ -128,7 +129,7 @@ For Apache commons pool user
 * Direct use pool.Config.xxx to change pool config
 * Default config value is same as java version
 * If TimeBetweenEvictionRunsMillis changed after ObjectPool created, should call  **ObjectPool.StartEvictor** to take effect. Java version do this on set method.
-* No KeyedObjectPool
+* No KeyedObjectPool (TODO)
 * No ProxiedObjectPool
 * No pool stats (TODO)
 
