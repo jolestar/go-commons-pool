@@ -10,12 +10,12 @@ type MyPoolObject struct {
 }
 
 func TestExample(t *testing.T) {
-	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+	p := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
 		func() (interface{}, error) {
 			return &MyPoolObject{}, nil
 		}))
-	obj, _ := pool.BorrowObject()
-	pool.ReturnObject(obj)
+	obj, _ := p.BorrowObject()
+	p.ReturnObject(obj)
 }
 
 type MyObjectFactory struct {
@@ -46,38 +46,38 @@ func (f *MyObjectFactory) PassivateObject(object *PooledObject) error {
 }
 
 func TestCustomFactoryExample(t *testing.T) {
-	pool := NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
-	obj, _ := pool.BorrowObject()
-	pool.ReturnObject(obj)
+	p := NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
+	obj, _ := p.BorrowObject()
+	p.ReturnObject(obj)
 }
 
 func TestStringExample(t *testing.T) {
-	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+	p := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
 		func() (interface{}, error) {
 			var stringPointer = new(string)
 			*stringPointer = "hello"
 			return stringPointer, nil
 		}))
-	obj, _ := pool.BorrowObject()
+	obj, _ := p.BorrowObject()
 	fmt.Println(obj)
 	assert.Equal(t, "hello", *obj.(*string))
-	pool.ReturnObject(obj)
+	p.ReturnObject(obj)
 }
 
 //func TestStringExampleFail(t *testing.T) {
-//	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+//	p := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
 //		func() (interface{}, error) {
 //			return "hello", nil
 //		}))
-//	obj, _ := pool.BorrowObject()
-//	pool.ReturnObject(obj)
+//	obj, _ := p.BorrowObject()
+//	p.ReturnObject(obj)
 //}
-
+//
 //func TestIntExampleFail(t *testing.T) {
-//	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
+//	p := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
 //		func() (interface{}, error) {
 //			return 1, nil
 //		}))
-//	obj, _ := pool.BorrowObject()
-//	pool.ReturnObject(obj)
+//	obj, _ := p.BorrowObject()
+//	p.ReturnObject(obj)
 //}
