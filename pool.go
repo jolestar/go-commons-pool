@@ -107,7 +107,7 @@ func (pool *ObjectPool) addIdleObject(p *PooledObject) {
 	}
 }
 
-// BorrowObject obtains an instance from pool pool.
+// BorrowObject obtains an instance from pool.
 // Instances returned from pool method will have been either newly created
 // with PooledObjectFactory.MakeObject or will be a previously
 // idle object and have been activated with
@@ -120,14 +120,14 @@ func (pool *ObjectPool) BorrowObject() (interface{}, error) {
 	return pool.borrowObject(pool.Config.MaxWaitMillis)
 }
 
-// GetNumIdle return the number of instances currently idle in pool pool. This may be
+// GetNumIdle return the number of instances currently idle in pool. This may be
 // considered an approximation of the number of objects that can be
 // BorrowObject borrowed without creating any new instances.
 func (pool *ObjectPool) GetNumIdle() int {
 	return pool.idleObjects.Size()
 }
 
-// GetNumActive return the number of instances currently borrowed from pool pool.
+// GetNumActive return the number of instances currently borrowed from pool.
 func (pool *ObjectPool) GetNumActive() int {
 	return pool.allObjects.Size() - pool.idleObjects.Size()
 }
@@ -371,7 +371,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	if !ok {
 		if !pool.isAbandonedConfig() {
 			return NewIllegalStateErr(
-				"Returned object not currently part of pool pool")
+				"Returned object not currently part of pool")
 		}
 		return nil // Object was abandoned and removed
 	}
@@ -381,7 +381,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	if state != StateAllocated {
 		p.lock.Unlock()
 		return NewIllegalStateErr(
-			"Object has already been returned to pool pool or is invalid")
+			"Object has already been returned to pool or is invalid")
 	}
 	//use unlock method markReturning() not MarkReturning
 	// because go lock is not recursive
@@ -410,7 +410,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	}
 
 	if !p.Deallocate() {
-		return NewIllegalStateErr("Object has already been returned to pool pool or is invalid")
+		return NewIllegalStateErr("Object has already been returned to pool or is invalid")
 	}
 
 	maxIdleSave := pool.Config.MaxIdle
@@ -457,7 +457,7 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 			return nil
 		}
 		return NewIllegalStateErr(
-			"Invalidated object not currently part of pool pool")
+			"Invalidated object not currently part of pool")
 	}
 	p.lock.Lock()
 	if p.state != StateInvalid {
@@ -468,7 +468,7 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 	return nil
 }
 
-// Close pool pool, and free any resources associated with it.
+// Close pool, and free any resources associated with it.
 func (pool *ObjectPool) Close() {
 	if pool.IsClosed() {
 		return
