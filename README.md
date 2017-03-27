@@ -60,8 +60,8 @@ Usage
     type MyObjectFactory struct {
     }
     
-    func (f *MyObjectFactory) MakeObject() (*PooledObject, error) {
-    	return NewPooledObject(&MyPoolObject{}), nil
+    func (f *MyObjectFactory) MakeObject() (*pool.PooledObject, error) {
+    	return pool.NewPooledObject(&MyPoolObject{}), nil
     }
     
     func (f *MyObjectFactory) DestroyObject(object *PooledObject) error {
@@ -69,17 +69,17 @@ Usage
     	return nil
     }
     
-    func (f *MyObjectFactory) ValidateObject(object *PooledObject) bool {
+    func (f *MyObjectFactory) ValidateObject(object *pool.PooledObject) bool {
     	//do validate
     	return true
     }
     
-    func (f *MyObjectFactory) ActivateObject(object *PooledObject) error {
+    func (f *MyObjectFactory) ActivateObject(object *pool.PooledObject) error {
     	//do activate
     	return nil
     }
     
-    func (f *MyObjectFactory) PassivateObject(object *PooledObject) error {
+    func (f *MyObjectFactory) PassivateObject(object *pool.PooledObject) error {
     	//do passivate
     	return nil
     }
