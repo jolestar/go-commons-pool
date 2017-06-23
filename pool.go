@@ -1,12 +1,14 @@
 package pool
 
 import (
+	"context"
 	"errors"
-	"github.com/jolestar/go-commons-pool/collections"
-	"github.com/jolestar/go-commons-pool/concurrent"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/collections"
+	"github.com/jolestar/go-commons-pool/concurrent"
 )
 
 type baseErr struct {
@@ -53,6 +55,7 @@ type ObjectPool struct {
 	destroyedByBorrowValidationCount concurrent.AtomicInteger
 	evictor                          *time.Ticker
 	evictionIterator                 collections.Iterator
+	evictorCancelFunc                context.CancelFunc
 }
 
 // NewObjectPool return new ObjectPool, init with PooledObjectFactory and ObjectPoolConfig
@@ -107,7 +110,7 @@ func (pool *ObjectPool) addIdleObject(p *PooledObject) {
 	}
 }
 
-// BorrowObject obtains an instance from pool pool.
+// BorrowObject obtains an instance from pool.
 // Instances returned from pool method will have been either newly created
 // with PooledObjectFactory.MakeObject or will be a previously
 // idle object and have been activated with
@@ -120,14 +123,14 @@ func (pool *ObjectPool) BorrowObject() (interface{}, error) {
 	return pool.borrowObject(pool.Config.MaxWaitMillis)
 }
 
-// GetNumIdle return the number of instances currently idle in pool pool. This may be
+// GetNumIdle return the number of instances currently idle in pool. This may be
 // considered an approximation of the number of objects that can be
 // BorrowObject borrowed without creating any new instances.
 func (pool *ObjectPool) GetNumIdle() int {
 	return pool.idleObjects.Size()
 }
 
-// GetNumActive return the number of instances currently borrowed from pool pool.
+// GetNumActive return the number of instances currently borrowed from pool.
 func (pool *ObjectPool) GetNumActive() int {
 	return pool.allObjects.Size() - pool.idleObjects.Size()
 }
@@ -371,7 +374,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	if !ok {
 		if !pool.isAbandonedConfig() {
 			return NewIllegalStateErr(
-				"Returned object not currently part of pool pool")
+				"Returned object not currently part of pool")
 		}
 		return nil // Object was abandoned and removed
 	}
@@ -381,7 +384,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	if state != StateAllocated {
 		p.lock.Unlock()
 		return NewIllegalStateErr(
-			"Object has already been returned to pool pool or is invalid")
+			"Object has already been returned to pool or is invalid")
 	}
 	//use unlock method markReturning() not MarkReturning
 	// because go lock is not recursive
@@ -410,7 +413,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	}
 
 	if !p.Deallocate() {
-		return NewIllegalStateErr("Object has already been returned to pool pool or is invalid")
+		return NewIllegalStateErr("Object has already been returned to pool or is invalid")
 	}
 
 	maxIdleSave := pool.Config.MaxIdle
@@ -457,7 +460,7 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 			return nil
 		}
 		return NewIllegalStateErr(
-			"Invalidated object not currently part of pool pool")
+			"Invalidated object not currently part of pool")
 	}
 	p.lock.Lock()
 	if p.state != StateInvalid {
@@ -468,7 +471,7 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 	return nil
 }
 
-// Close pool pool, and free any resources associated with it.
+// Close pool, and free any resources associated with it.
 func (pool *ObjectPool) Close() {
 	if pool.IsClosed() {
 		return
@@ -498,22 +501,60 @@ func (pool *ObjectPool) StartEvictor() {
 }
 
 func (pool *ObjectPool) startEvictor(delay int64) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// 第一次运行
+	if pool.evictorCancelFunc != nil {
+		pool.evictorCancelFunc()
+	}
+	pool.evictorCancelFunc = cancel
+
 	pool.evictionLock.Lock()
-	defer pool.evictionLock.Unlock()
 	if nil != pool.evictor {
 		pool.evictor.Stop()
 		pool.evictor = nil
 		pool.evictionIterator = nil
 	}
+	pool.evictionLock.Unlock()
+
 	if delay > 0 {
+		// pool.evictor 只在这个函数里用
+		pool.evictionLock.Lock()
 		pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
+		pool.evictionLock.Unlock()
+
 		go func() {
-			for range pool.evictor.C {
-				pool.evict()
-				pool.ensureMinIdle()
+			pool.evictionLock.Lock()
+			defer pool.evictionLock.Unlock()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-pool.evictor.C:
+					pool.evict()
+					pool.ensureMinIdle()
+				}
 			}
 		}()
 	}
+
+	// =========== bug code ==============
+	/*	pool.evictionLock.Lock()
+		defer pool.evictionLock.Unlock()
+		if nil != pool.evictor {
+			pool.evictor.Stop()
+			pool.evictor = nil
+			pool.evictionIterator = nil
+		}
+		if delay > 0 {
+			pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
+			go func() {
+				for range pool.evictor.C {
+					pool.evict()
+					pool.ensureMinIdle()
+				}
+			}()
+		}*/
 }
 
 func (pool *ObjectPool) getEvictionPolicy() EvictionPolicy {
@@ -564,8 +605,8 @@ func (pool *ObjectPool) evict() {
 	}
 	var underTest *PooledObject
 	evictionPolicy := pool.getEvictionPolicy()
-	pool.evictionLock.Lock()
-	defer pool.evictionLock.Unlock()
+	// pool.evictionLock.Lock()
+	// defer pool.evictionLock.Unlock()
 
 	evictionConfig := EvictionConfig{
 		IdleEvictTime:     pool.Config.MinEvictableIdleTimeMillis,
