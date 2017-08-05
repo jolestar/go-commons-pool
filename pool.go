@@ -1,12 +1,14 @@
 package pool
 
 import (
+	"context"
 	"errors"
-	"github.com/jolestar/go-commons-pool/collections"
-	"github.com/jolestar/go-commons-pool/concurrent"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/collections"
+	"github.com/jolestar/go-commons-pool/concurrent"
 )
 
 type baseErr struct {
@@ -53,6 +55,7 @@ type ObjectPool struct {
 	destroyedByBorrowValidationCount concurrent.AtomicInteger
 	evictor                          *time.Ticker
 	evictionIterator                 collections.Iterator
+	evictorCancelFunc                context.CancelFunc
 }
 
 // NewObjectPool return new ObjectPool, init with PooledObjectFactory and ObjectPoolConfig
@@ -498,22 +501,60 @@ func (pool *ObjectPool) StartEvictor() {
 }
 
 func (pool *ObjectPool) startEvictor(delay int64) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// 第一次运行
+	if pool.evictorCancelFunc != nil {
+		pool.evictorCancelFunc()
+	}
+	pool.evictorCancelFunc = cancel
+
 	pool.evictionLock.Lock()
-	defer pool.evictionLock.Unlock()
 	if nil != pool.evictor {
 		pool.evictor.Stop()
 		pool.evictor = nil
 		pool.evictionIterator = nil
 	}
+	pool.evictionLock.Unlock()
+
 	if delay > 0 {
+		// pool.evictor 只在这个函数里用
+		pool.evictionLock.Lock()
 		pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
+		pool.evictionLock.Unlock()
+
 		go func() {
-			for range pool.evictor.C {
-				pool.evict()
-				pool.ensureMinIdle()
+			pool.evictionLock.Lock()
+			defer pool.evictionLock.Unlock()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-pool.evictor.C:
+					pool.evict()
+					pool.ensureMinIdle()
+				}
 			}
 		}()
 	}
+
+	// =========== bug code ==============
+	/*	pool.evictionLock.Lock()
+		defer pool.evictionLock.Unlock()
+		if nil != pool.evictor {
+			pool.evictor.Stop()
+			pool.evictor = nil
+			pool.evictionIterator = nil
+		}
+		if delay > 0 {
+			pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
+			go func() {
+				for range pool.evictor.C {
+					pool.evict()
+					pool.ensureMinIdle()
+				}
+			}()
+		}*/
 }
 
 func (pool *ObjectPool) getEvictionPolicy() EvictionPolicy {
@@ -564,8 +605,8 @@ func (pool *ObjectPool) evict() {
 	}
 	var underTest *PooledObject
 	evictionPolicy := pool.getEvictionPolicy()
-	pool.evictionLock.Lock()
-	defer pool.evictionLock.Unlock()
+	// pool.evictionLock.Lock()
+	// defer pool.evictionLock.Unlock()
 
 	evictionConfig := EvictionConfig{
 		IdleEvictTime:     pool.Config.MinEvictableIdleTimeMillis,
