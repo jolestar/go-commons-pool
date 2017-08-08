@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+ORG_PATH="github.com/jolestar"
+REPO_PATH="${ORG_PATH}/go-commons-pool"
+IGNORE_PKGS="(vendor)"
+TEST_PKGS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS" | sed "s|\./||g"`
+INTEGRATION_PKGS="(integration|contrib)"
+TESTABLE=`echo "$TEST_PKGS" | egrep -v "$INTEGRATION_PKGS"`
+
+if [ -z "$PKG" ]; then
+        TEST=$TESTABLE
+else
+        # strip out leading dotslashes and trailing slashes from PKG=./foo/
+        TEST=${PKG/#./}
+        TEST=${TEST/#\//}
+        TEST=${TEST/%\//}
+fi
+
+# split TEST into an array and prepend REPO_PATH to each local package
+split=(${TEST// / })
+TEST=${split[@]/#/${REPO_PATH}/}
+
+echo "Running tests... ${TEST}"
+go test --race -timeout 5m -run=Test $@ ${TEST}
