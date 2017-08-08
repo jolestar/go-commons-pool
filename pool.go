@@ -505,7 +505,7 @@ func (pool *ObjectPool) startEvictor(delay int64) {
 	if pool.evictor != nil {
 		pool.evictor.Stop()
 		close(pool.evictorStopChan)
-		//ensure evict goroutine quit, then set evictor to nil.
+		//Ensure old evictor goroutine quit, only one evictor goroutine at same time, then set evictor to nil.
 		pool.evictorStopWG.Wait()
 		pool.evictor = nil
 		pool.evictionIterator = nil
@@ -578,8 +578,6 @@ func (pool *ObjectPool) evict() {
 	}
 	var underTest *PooledObject
 	evictionPolicy := pool.getEvictionPolicy()
-	pool.evictionLock.Lock()
-	defer pool.evictionLock.Unlock()
 
 	evictionConfig := EvictionConfig{
 		IdleEvictTime:     pool.Config.MinEvictableIdleTimeMillis,

@@ -992,19 +992,18 @@ func (suit *PoolTestSuite) TestStartAndStopEvictorConcurrent() {
 	defer leaktest.Check(suit.T())()
 	// set up pool without evictor
 	suit.pool.Config.MaxIdle = 6
-	suit.pool.Config.MaxTotal = 6
+	suit.pool.Config.MaxTotal = 100
 	suit.pool.Config.NumTestsPerEvictionRun = 6
 	suit.pool.Config.MinEvictableIdleTimeMillis = int64(100)
 
 	testWG := sync.WaitGroup{}
-	testWG.Add(11)
-	for i :=0; i < 10; i++ {
-		go func() {
+	testWG.Add(101)
+	for i :=0; i < 100; i++ {
+		go func(idx int) {
 			time.Sleep( time.Duration(rand.Intn(100))* time.Millisecond)
-			suit.pool.Config.TimeBetweenEvictionRunsMillis = int64(10 + i)
-			suit.pool.StartEvictor()
+			suit.pool.startEvictor(int64(10 + idx))
 			testWG.Done()
-		}()
+		}(i)
 	}
 	go func() {
 		for j := 0; j < 10; j++ {
