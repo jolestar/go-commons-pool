@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/fortytw2/leaktest"
 	"github.com/jolestar/go-commons-pool/collections"
 	"github.com/jolestar/go-commons-pool/concurrent"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"github.com/fortytw2/leaktest"
 )
 
 type TestObject struct {
@@ -26,7 +26,7 @@ var (
 	debugTest = false
 )
 
-func init(){
+func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
@@ -998,9 +998,9 @@ func (suit *PoolTestSuite) TestStartAndStopEvictorConcurrent() {
 
 	testWG := sync.WaitGroup{}
 	testWG.Add(101)
-	for i :=0; i < 100; i++ {
+	for i := 0; i < 100; i++ {
 		go func(idx int) {
-			time.Sleep( time.Duration(rand.Intn(100))* time.Millisecond)
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
 			suit.pool.startEvictor(int64(10 + idx))
 			testWG.Done()
 		}(i)

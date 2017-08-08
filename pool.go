@@ -52,8 +52,8 @@ type ObjectPool struct {
 	destroyedCount                   concurrent.AtomicInteger
 	destroyedByBorrowValidationCount concurrent.AtomicInteger
 	evictor                          *time.Ticker
-	evictorStopChan					 chan struct{}
-	evictorStopWG					 sync.WaitGroup
+	evictorStopChan                  chan struct{}
+	evictorStopWG                    sync.WaitGroup
 	evictionIterator                 collections.Iterator
 }
 
@@ -516,12 +516,12 @@ func (pool *ObjectPool) startEvictor(delay int64) {
 		pool.evictorStopWG = sync.WaitGroup{}
 		pool.evictorStopWG.Add(1)
 		go func() {
-			for{
+			for {
 				select {
-				case <- pool.evictor.C:
+				case <-pool.evictor.C:
 					pool.evict()
 					pool.ensureMinIdle()
-				case <- pool.evictorStopChan:
+				case <-pool.evictorStopChan:
 					pool.evictorStopWG.Done()
 					return
 				}
