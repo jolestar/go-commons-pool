@@ -24,3 +24,5 @@ _testmain.go
 *.prof
 .idea
 *.coverprofile
+coverage.txt
+profile.out
