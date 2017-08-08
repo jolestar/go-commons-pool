@@ -15,6 +15,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"github.com/fortytw2/leaktest"
 )
 
 type TestObject struct {
@@ -24,6 +25,10 @@ type TestObject struct {
 var (
 	debugTest = false
 )
+
+func init(){
+	rand.Seed(time.Now().UnixNano())
+}
 
 type SimpleFactory struct {
 	makeCounter          int
@@ -944,6 +949,7 @@ func (suit *PoolTestSuite) TestMaxTotalUnderLoad() {
 }
 
 func (suit *PoolTestSuite) TestStartAndStopEvictor() {
+	defer leaktest.Check(suit.T())()
 	// set up pool without evictor
 	suit.pool.Config.MaxIdle = 6
 	suit.pool.Config.MaxTotal = 6
@@ -980,6 +986,48 @@ func (suit *PoolTestSuite) TestStartAndStopEvictor() {
 		// stop the evictor
 		suit.pool.startEvictor(int64(0))
 	}
+}
+
+func (suit *PoolTestSuite) TestStartAndStopEvictorConcurrent() {
+	defer leaktest.Check(suit.T())()
+	// set up pool without evictor
+	suit.pool.Config.MaxIdle = 6
+	suit.pool.Config.MaxTotal = 6
+	suit.pool.Config.NumTestsPerEvictionRun = 6
+	suit.pool.Config.MinEvictableIdleTimeMillis = int64(100)
+
+	testWG := sync.WaitGroup{}
+	testWG.Add(11)
+	for i :=0; i < 10; i++ {
+		go func() {
+			time.Sleep( time.Duration(rand.Intn(100))* time.Millisecond)
+			suit.pool.Config.TimeBetweenEvictionRunsMillis = int64(10 + i)
+			suit.pool.StartEvictor()
+			testWG.Done()
+		}()
+	}
+	go func() {
+		for j := 0; j < 10; j++ {
+			// populate the pool
+			active := make([]*TestObject, 6)
+			for i := 0; i < 6; i++ {
+				active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+			}
+			for i := 0; i < 6; i++ {
+				suit.NoError(suit.pool.ReturnObject(active[i]))
+			}
+			// wait a second (well, .1 seconds)
+			time.Sleep(time.Duration(10) * time.Millisecond)
+		}
+		testWG.Done()
+	}()
+	testWG.Wait()
+	// wait a second (well, .2 seconds)
+	time.Sleep(time.Duration(200) * time.Millisecond)
+
+	// assert that the evictor has cleared out the pool
+	suit.Equal(0, suit.pool.GetNumIdle(), "Should have 0 idle")
+	suit.pool.startEvictor(int64(0))
 }
 
 func (suit *PoolTestSuite) TestEvictionWithNegativeNumTests() {

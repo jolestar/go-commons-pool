@@ -52,6 +52,8 @@ type ObjectPool struct {
 	destroyedCount                   concurrent.AtomicInteger
 	destroyedByBorrowValidationCount concurrent.AtomicInteger
 	evictor                          *time.Ticker
+	evictorStopChan					 chan struct{}
+	evictorStopWG					 sync.WaitGroup
 	evictionIterator                 collections.Iterator
 }
 
@@ -500,17 +502,29 @@ func (pool *ObjectPool) StartEvictor() {
 func (pool *ObjectPool) startEvictor(delay int64) {
 	pool.evictionLock.Lock()
 	defer pool.evictionLock.Unlock()
-	if nil != pool.evictor {
+	if pool.evictor != nil {
 		pool.evictor.Stop()
+		close(pool.evictorStopChan)
+		//ensure evict goroutine quit, then set evictor to nil.
+		pool.evictorStopWG.Wait()
 		pool.evictor = nil
 		pool.evictionIterator = nil
 	}
 	if delay > 0 {
 		pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
+		pool.evictorStopChan = make(chan struct{})
+		pool.evictorStopWG = sync.WaitGroup{}
+		pool.evictorStopWG.Add(1)
 		go func() {
-			for range pool.evictor.C {
-				pool.evict()
-				pool.ensureMinIdle()
+			for{
+				select {
+				case <- pool.evictor.C:
+					pool.evict()
+					pool.ensureMinIdle()
+				case <- pool.evictorStopChan:
+					pool.evictorStopWG.Done()
+					return
+				}
 			}
 		}()
 	}
