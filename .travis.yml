@@ -1,11 +1,11 @@
 language: go
 sudo: false
 go:
-- 1.4
 - 1.6
 - 1.7
+- 1.8
 - tip
-install:
-- go get github.com/stretchr/testify
 script:
-- go test -v -race ./...
+- ./test
+after_success:
+- bash <(curl -s https://codecov.io/bash)

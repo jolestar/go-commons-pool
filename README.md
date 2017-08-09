@@ -2,8 +2,7 @@ Go Commons Pool
 =====
 
 [![Build Status](https://travis-ci.org/jolestar/go-commons-pool.svg?branch=master)](https://travis-ci.org/jolestar/go-commons-pool)
-[![Circle CI](https://circleci.com/gh/jolestar/go-commons-pool.svg?style=svg)](https://circleci.com/gh/jolestar/go-commons-pool)
-[![Coverage Status](https://coveralls.io/repos/jolestar/go-commons-pool/badge.svg?branch=master&service=github&_day=201606)](https://coveralls.io/github/jolestar/go-commons-pool?branch=master)
+[![CodeCov](https://codecov.io/gh/jolestar/go-commons-pool/branch/master/graph/badge.svg)](https://codecov.io/gh/jolestar/go-commons-pool)
 [![GoDoc](http://godoc.org/github.com/jolestar/go-commons-pool?status.svg)](http://godoc.org/github.com/jolestar/go-commons-pool)
 
 The Go Commons Pool is a generic object pool for [Golang](http://golang.org/), direct rewrite from [Apache Commons Pool](https://commons.apache.org/proper/commons-pool/).
