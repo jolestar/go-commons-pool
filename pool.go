@@ -132,6 +132,15 @@ func (pool *ObjectPool) BorrowObject() (interface{}, error) {
 	return pool.BorrowObjectWithContext(ctx)
 }
 
+// BorrowObjectWithContext obtains an instance from pool.
+// Instances returned from pool method will have been either newly created
+// with PooledObjectFactory.MakeObject or will be a previously
+// idle object and have been activated with
+// PooledObjectFactory.ActivateObject and then validated with
+// PooledObjectFactory.ValidateObject.
+//
+// By contract, clients must return the borrowed instance
+// using ReturnObject, InvalidateObject
 func (pool *ObjectPool) BorrowObjectWithContext(ctx context.Context) (interface{}, error) {
 	return pool.borrowObject(ctx)
 }
@@ -653,7 +662,6 @@ func (pool *ObjectPool) evict() {
 			}
 		}
 	}
-
 }
 
 func (pool *ObjectPool) ensureMinIdle() {
