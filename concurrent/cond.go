@@ -1,6 +1,7 @@
 package concurrent
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -18,8 +19,8 @@ func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 	return &cond
 }
 
-// WaitWithTimeout wait for signal return remain wait time, and is interrupted
-func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
+// WaitWithContext waits for a signal, or for the context do be done. Returns true if signaled.
+func (cond *TimeoutCond) WaitWithContext(ctx context.Context) bool {
 	cond.setHasWaiters(true)
 	ch := cond.signal
 	//wait should unlock mutex,  if not will cause deadlock
@@ -27,15 +28,25 @@ func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, 
 	defer cond.setHasWaiters(false)
 	defer cond.L.Lock()
 
-	begin := time.Now().UnixNano()
 	select {
 	case _, ok := <-ch:
-		end := time.Now().UnixNano()
-		remainTimeout := timeout - time.Duration(end-begin)
-		return remainTimeout, !ok
-	case <-time.After(timeout):
-		return 0, false
+		return !ok
+	case <-ctx.Done():
+		return false
 	}
+}
+
+// WaitWithTimeout wait for signal return remain wait time, and is interrupted
+func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	begin := time.Now()
+	interrupted := cond.WaitWithContext(ctx)
+	elapsed := time.Since(begin)
+	remainingTimeout := timeout - elapsed
+
+	return remainingTimeout, interrupted
 }
 
 func (cond *TimeoutCond) setHasWaiters(value bool) {

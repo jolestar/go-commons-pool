@@ -1,13 +1,15 @@
 package pool
 
 import (
+	"context"
 	"fmt"
-	"github.com/jolestar/go-commons-pool/concurrent"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 type AbandonedTestObject struct {
@@ -344,8 +346,11 @@ func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
 
 	suit.NoErrorWithResult(suit.pool.BorrowObject())
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	start := currentTimeMillis()
-	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(5000))
+	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(ctx))
 	end := currentTimeMillis()
 
 	suit.pool.ReturnObject(o2)
