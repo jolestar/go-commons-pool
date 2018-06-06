@@ -1,21 +1,22 @@
 package concurrent
 
 import (
-	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type LockTestObject struct {
+	t    *testing.T
 	lock *sync.Mutex
 	cond *TimeoutCond
 }
 
-func NewLockTestObject() *LockTestObject {
+func NewLockTestObject(t *testing.T) *LockTestObject {
 	lock := new(sync.Mutex)
-	return &LockTestObject{lock: lock, cond: NewTimeoutCond(lock)}
+	return &LockTestObject{t: t, lock: lock, cond: NewTimeoutCond(lock)}
 }
 
 func (o *LockTestObject) lockAndWaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
@@ -27,20 +28,22 @@ func (o *LockTestObject) lockAndWaitWithTimeout(timeout time.Duration) (time.Dur
 func (o *LockTestObject) lockAndWait() bool {
 	o.lock.Lock()
 	defer o.lock.Unlock()
-	fmt.Println("lockAndWait")
+	o.t.Log("lockAndWait")
 	return o.cond.Wait()
 }
 
 func (o *LockTestObject) lockAndNotify() {
 	o.lock.Lock()
 	defer o.lock.Unlock()
-	fmt.Println("lockAndNotify")
+	o.t.Log("lockAndNotify")
 	o.cond.Signal()
 }
 
 func TestTimeoutCondWait(t *testing.T) {
-	fmt.Println("TestTimeoutCondWait")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestTimeoutCondWait")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	go func() {
@@ -56,8 +59,10 @@ func TestTimeoutCondWait(t *testing.T) {
 }
 
 func TestTimeoutCondWaitTimeout(t *testing.T) {
-	fmt.Println("TestTimeoutCondWaitTimeout")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestTimeoutCondWaitTimeout")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	wait.Add(1)
 	go func() {
@@ -68,8 +73,10 @@ func TestTimeoutCondWaitTimeout(t *testing.T) {
 }
 
 func TestTimeoutCondWaitTimeoutNotify(t *testing.T) {
-	fmt.Println("TestTimeoutCondWaitTimeoutNotify")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestTimeoutCondWaitTimeoutNotify")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	ch := make(chan int, 1)
@@ -102,8 +109,10 @@ func currentTimeMillis() int64 {
 }
 
 func TestTimeoutCondWaitTimeoutRemain(t *testing.T) {
-	fmt.Println("TestTimeoutCondWaitTimeoutRemain")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestTimeoutCondWaitTimeoutRemain")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	ch := make(chan time.Duration, 1)
@@ -126,18 +135,23 @@ func TestTimeoutCondWaitTimeoutRemain(t *testing.T) {
 }
 
 func TestTimeoutCondHasWaiters(t *testing.T) {
-	fmt.Println("TestTimeoutCondHasWaiters")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestTimeoutCondHasWaiters")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
-	wait.Add(2)
-	go func() {
-		obj.lockAndWait()
-		wait.Done()
-	}()
+	for i := 0; i < 2; i++ {
+		wait.Add(1)
+		go func() {
+			obj.lockAndWait()
+			wait.Done()
+		}()
+	}
 	time.Sleep(time.Duration(50) * time.Millisecond)
 	obj.lock.Lock()
 	assert.True(t, obj.cond.HasWaiters())
 	obj.lock.Unlock()
+	wait.Add(1)
 	go func() {
 		obj.lockAndNotify()
 		wait.Done()
@@ -146,8 +160,10 @@ func TestTimeoutCondHasWaiters(t *testing.T) {
 	assert.False(t, obj.cond.HasWaiters())
 }
 func TestInterrupted(t *testing.T) {
-	fmt.Println("TestInterrupted")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestInterrupted")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	count := 5
 	wait.Add(5)
@@ -168,8 +184,10 @@ func TestInterrupted(t *testing.T) {
 }
 
 func TestInterruptedWithTimeout(t *testing.T) {
-	fmt.Println("TestInterruptedWithTimeout")
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	t.Log("TestInterruptedWithTimeout")
+	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	count := 5
 	wait.Add(5)
@@ -192,6 +210,8 @@ func TestInterruptedWithTimeout(t *testing.T) {
 }
 
 func TestSignalNoWait(t *testing.T) {
-	obj := NewLockTestObject()
+	t.Parallel()
+
+	obj := NewLockTestObject(t)
 	obj.cond.Signal()
 }
