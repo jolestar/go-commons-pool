@@ -32,11 +32,17 @@ func (o *LockTestObject) lockAndWait() bool {
 	return o.cond.Wait()
 }
 
-func (o *LockTestObject) lockAndNotify() {
+func (o *LockTestObject) lockAndSignal() {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	o.t.Log("lockAndNotify")
 	o.cond.Signal()
+}
+
+func (o *LockTestObject) lockHasWaiters() bool {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	return o.cond.HasWaiters()
 }
 
 func TestTimeoutCondWait(t *testing.T) {
@@ -50,9 +56,9 @@ func TestTimeoutCondWait(t *testing.T) {
 		obj.lockAndWait()
 		wait.Done()
 	}()
-	time.Sleep(time.Duration(50) * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	go func() {
-		obj.lockAndNotify()
+		obj.lockAndSignal()
 		wait.Done()
 	}()
 	wait.Wait()
@@ -66,7 +72,7 @@ func TestTimeoutCondWaitTimeout(t *testing.T) {
 	wait := sync.WaitGroup{}
 	wait.Add(1)
 	go func() {
-		obj.lockAndWaitWithTimeout(time.Duration(2) * time.Second)
+		obj.lockAndWaitWithTimeout(2 * time.Second)
 		wait.Done()
 	}()
 	wait.Wait()
@@ -90,7 +96,7 @@ func TestTimeoutCondWaitTimeoutNotify(t *testing.T) {
 	}()
 	sleep(200)
 	go func() {
-		obj.lockAndNotify()
+		obj.lockAndSignal()
 		wait.Done()
 	}()
 	wait.Wait()
@@ -116,7 +122,7 @@ func TestTimeoutCondWaitTimeoutRemain(t *testing.T) {
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	ch := make(chan time.Duration, 1)
-	timeout := time.Duration(2000) * time.Millisecond
+	timeout := 2000 * time.Millisecond
 	go func() {
 		remainTimeout, _ := obj.lockAndWaitWithTimeout(timeout)
 		ch <- remainTimeout
@@ -124,14 +130,14 @@ func TestTimeoutCondWaitTimeoutRemain(t *testing.T) {
 	}()
 	sleep(200)
 	go func() {
-		obj.lockAndNotify()
+		obj.lockAndSignal()
 		wait.Done()
 	}()
 	wait.Wait()
 	remainTimeout := <-ch
 	close(ch)
 	assert.True(t, remainTimeout < timeout, "expect remainTimeout %v < %v", remainTimeout, timeout)
-	assert.True(t, remainTimeout >= time.Duration(200)*time.Millisecond, "expect remainTimeout %v >= 200 millisecond", remainTimeout)
+	assert.True(t, remainTimeout >= 200*time.Millisecond, "expect remainTimeout %v >= 200 millisecond", remainTimeout)
 }
 
 func TestTimeoutCondHasWaiters(t *testing.T) {
@@ -139,25 +145,24 @@ func TestTimeoutCondHasWaiters(t *testing.T) {
 
 	t.Log("TestTimeoutCondHasWaiters")
 	obj := NewLockTestObject(t)
-	wait := sync.WaitGroup{}
+	waitersCount := 2
+	ch := make(chan struct{}, waitersCount)
 	for i := 0; i < 2; i++ {
-		wait.Add(1)
 		go func() {
 			obj.lockAndWait()
-			wait.Done()
+			ch <- struct{}{}
 		}()
 	}
-	time.Sleep(time.Duration(50) * time.Millisecond)
-	obj.lock.Lock()
-	assert.True(t, obj.cond.HasWaiters())
-	obj.lock.Unlock()
-	wait.Add(1)
-	go func() {
-		obj.lockAndNotify()
-		wait.Done()
-	}()
-	wait.Wait()
-	assert.False(t, obj.cond.HasWaiters())
+	time.Sleep(50 * time.Millisecond)
+	assert.True(t, obj.lockHasWaiters(), "Should have waiters")
+
+	obj.lockAndSignal()
+	<-ch
+	assert.True(t, obj.lockHasWaiters(), "Should still have waiters")
+
+	obj.lockAndSignal()
+	<-ch
+	assert.False(t, obj.lockHasWaiters(), "Should no longer have waiters")
 }
 func TestInterrupted(t *testing.T) {
 	t.Parallel()
@@ -192,7 +197,7 @@ func TestInterruptedWithTimeout(t *testing.T) {
 	count := 5
 	wait.Add(5)
 	ch := make(chan bool, 5)
-	timeout := time.Duration(1000) * time.Millisecond
+	timeout := 1000 * time.Millisecond
 	for i := 0; i < count; i++ {
 		go func() {
 			_, interrupted := obj.lockAndWaitWithTimeout(timeout)
