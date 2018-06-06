@@ -2,12 +2,13 @@ package pool
 
 import (
 	"fmt"
-	"github.com/jolestar/go-commons-pool/concurrent"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 type AbandonedTestObject struct {
