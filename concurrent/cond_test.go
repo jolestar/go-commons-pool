@@ -1,9 +1,12 @@
 package concurrent
 
 import (
+	"math"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,9 +42,7 @@ func (o *LockTestObject) lockAndSignal() {
 	o.cond.Signal()
 }
 
-func (o *LockTestObject) lockHasWaiters() bool {
-	o.lock.Lock()
-	defer o.lock.Unlock()
+func (o *LockTestObject) hasWaiters() bool {
 	return o.cond.HasWaiters()
 }
 
@@ -154,16 +155,33 @@ func TestTimeoutCondHasWaiters(t *testing.T) {
 		}()
 	}
 	time.Sleep(50 * time.Millisecond)
-	assert.True(t, obj.lockHasWaiters(), "Should have waiters")
+	assert.True(t, obj.hasWaiters(), "Should have waiters")
 
 	obj.lockAndSignal()
 	<-ch
-	assert.True(t, obj.lockHasWaiters(), "Should still have waiters")
+	assert.True(t, obj.hasWaiters(), "Should still have waiters")
 
 	obj.lockAndSignal()
 	<-ch
-	assert.False(t, obj.lockHasWaiters(), "Should no longer have waiters")
+	assert.False(t, obj.hasWaiters(), "Should no longer have waiters")
 }
+
+func TestTooManyWaiters(t *testing.T) {
+	t.Parallel()
+
+	obj := NewLockTestObject(t)
+	obj.cond.hasWaiters = math.MaxUint64
+
+	require.Panics(t, func() { obj.lockAndWait() })
+}
+
+func TestRemoveWaiterUsedIncorrectly(t *testing.T) {
+	t.Parallel()
+
+	cond := NewTimeoutCond(&sync.Mutex{})
+	require.Panics(t, cond.removeWaiter)
+}
+
 func TestInterrupted(t *testing.T) {
 	t.Parallel()
 
