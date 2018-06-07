@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"errors"
 	"math"
 	"sync"
@@ -134,7 +135,28 @@ func (pool *ObjectPool) addIdleObject(p *PooledObject) error {
 // By contract, clients must return the borrowed instance
 // using ReturnObject, InvalidateObject
 func (pool *ObjectPool) BorrowObject() (interface{}, error) {
-	return pool.borrowObject(pool.Config.MaxWaitMillis)
+	ctx := context.Background()
+
+	if pool.Config.MaxWaitMillis >= 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(pool.Config.MaxWaitMillis)*time.Millisecond)
+		defer cancel()
+	}
+
+	return pool.BorrowObjectWithContext(ctx)
+}
+
+// BorrowObjectWithContext obtains an instance from pool.
+// Instances returned from pool method will have been either newly created
+// with PooledObjectFactory.MakeObject or will be a previously
+// idle object and have been activated with
+// PooledObjectFactory.ActivateObject and then validated with
+// PooledObjectFactory.ValidateObject.
+//
+// By contract, clients must return the borrowed instance
+// using ReturnObject, InvalidateObject
+func (pool *ObjectPool) BorrowObjectWithContext(ctx context.Context) (interface{}, error) {
+	return pool.borrowObject(ctx)
 }
 
 // GetNumIdle return the number of instances currently idle in pool. This may be
@@ -236,7 +258,7 @@ func (pool *ObjectPool) updateStatsReturn(activeTime int64) {
 	//activeTimes.add(activeTime);
 }
 
-func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, error) {
+func (pool *ObjectPool) borrowObject(ctx context.Context) (interface{}, error) {
 	if pool.IsClosed() {
 		return nil, NewIllegalStateErr("Pool not open")
 	}
@@ -271,20 +293,11 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				}
 			}
 			if p == nil {
-				if borrowMaxWaitMillis < 0 {
-					obj, err := pool.idleObjects.TakeFirst()
-					if err != nil {
-						return nil, err
-					}
-					p, ok = obj.(*PooledObject)
-				} else {
-					obj, err := pool.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond)
-					if err != nil {
-						return nil, err
-					}
-					p, ok = obj.(*PooledObject)
+				obj, err := pool.idleObjects.PollFirstWithContext(ctx)
+				if err != nil {
+					return nil, err
 				}
-
+				p, ok = obj.(*PooledObject)
 			}
 			if !ok {
 				return nil, NewNoSuchElementErr("Timeout waiting for idle object")
@@ -663,7 +676,6 @@ func (pool *ObjectPool) evict() {
 			}
 		}
 	}
-
 }
 
 func (pool *ObjectPool) ensureMinIdle() {

@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -345,8 +346,11 @@ func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
 
 	suit.NoErrorWithResult(suit.pool.BorrowObject())
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	start := currentTimeMillis()
-	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(5000))
+	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(ctx))
 	end := currentTimeMillis()
 
 	suit.pool.ReturnObject(o2)

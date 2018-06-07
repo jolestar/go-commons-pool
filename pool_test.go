@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -223,6 +224,8 @@ func (suit *PoolTestSuite) ErrorWithResult(object interface{}, err error) error 
 }
 
 func TestPoolTestSuite(t *testing.T) {
+	t.Parallel()
+
 	suite.Run(t, new(PoolTestSuite))
 }
 
@@ -945,8 +948,7 @@ func (suit *PoolTestSuite) TestTimeoutNoLeak() {
 	suit.NoError(err)
 	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
 	err3 := suit.ErrorWithResult(suit.pool.BorrowObject())
-	_, ok := err3.(*NoSuchElementErr)
-	suit.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err3))
+	suit.IsType(&NoSuchElementErr{}, err3, err3)
 
 	suit.NoError(suit.pool.ReturnObject(obj2))
 	suit.NoError(suit.pool.ReturnObject(obj))
@@ -1285,14 +1287,16 @@ func (suit *PoolTestSuite) TestEvictionInvalid() {
 	}()
 
 	// Sleep to make sure evictor has started
-	time.Sleep(time.Duration(300) * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
-	err := suit.ErrorWithResult(suit.pool.borrowObject(1))
-	_, ok := err.(*NoSuchElementErr)
-	suit.True(ok, "expect NoSuchElementErr, but get %v", reflect.TypeOf(ok))
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	err := suit.ErrorWithResult(suit.pool.borrowObject(ctx))
+	suit.IsType(err, &NoSuchElementErr{})
 
 	// Make sure evictor has finished
-	time.Sleep(time.Duration(1000) * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	// Should have an empty pool
 	suit.Equal(0, suit.pool.GetNumIdle(), "Idle count different than expected.")
 	suit.Equal(0, suit.pool.GetNumActive(), "Total count different than expected.")
@@ -1548,8 +1552,7 @@ func (suit *PoolTestSuite) TestWhenExhaustedBlockClosePool() {
 	// Check goroutine was interrupted
 	result := <-ch
 	close(ch)
-	_, ok := result.error.(*collections.InterruptedErr)
-	suit.True(ok, "expect InterruptedErr, but get: %v", reflect.TypeOf(result.error))
+	suit.IsType(&collections.InterruptedErr{}, result.error, result.error.Error())
 }
 
 func waitTestGoroutine(pool *ObjectPool, pause int) chan TestGoroutineResult {
