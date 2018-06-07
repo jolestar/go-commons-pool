@@ -1899,6 +1899,16 @@ func (suit *PoolTestSuite) TestMakeObjectError() {
 	suit.NotNil(err)
 }
 
+func (suit *PoolTestSuite) TestAddObjectPassivateError() {
+	suit.factory.exceptionOnPassivate = true
+	suit.Equal(0, suit.pool.GetNumActive())
+	suit.Equal(0, suit.pool.GetNumIdle())
+	err := suit.pool.AddObject()
+	suit.EqualError(err, "passivate error")
+	suit.Equal(0, suit.pool.GetNumActive())
+	suit.Equal(0, suit.pool.GetNumIdle())
+}
+
 func (suit *PoolTestSuite) TestReturnObjectError() {
 	obj := new(TestObject)
 	err := suit.pool.ReturnObject(obj)
