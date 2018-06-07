@@ -96,19 +96,33 @@ func (pool *ObjectPool) AddObject() error {
 	if e != nil {
 		return e
 	}
-	pool.addIdleObject(p)
+	e = pool.addIdleObject(p)
+	if e != nil {
+		pool.destroy(p)
+		return e
+	}
 	return nil
 }
 
-func (pool *ObjectPool) addIdleObject(p *PooledObject) {
+func (pool *ObjectPool) addIdleObject(p *PooledObject) error {
 	if p != nil {
-		pool.factory.PassivateObject(p)
+		err := pool.factory.PassivateObject(p)
+		if err != nil {
+			return err
+		}
+
 		if pool.Config.Lifo {
-			pool.idleObjects.AddFirst(p)
+			err = pool.idleObjects.AddFirst(p)
 		} else {
-			pool.idleObjects.AddLast(p)
+			err = pool.idleObjects.AddLast(p)
+		}
+
+		if err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 // BorrowObject obtains an instance from pool.
