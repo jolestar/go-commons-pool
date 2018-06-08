@@ -134,28 +134,7 @@ func (pool *ObjectPool) addIdleObject(ctx context.Context, p *PooledObject) erro
 //
 // By contract, clients must return the borrowed instance
 // using ReturnObject, InvalidateObject
-func (pool *ObjectPool) BorrowObject() (interface{}, error) {
-	ctx := context.Background()
-
-	if pool.Config.MaxWaitMillis >= 0 {
-		var cancel func()
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(pool.Config.MaxWaitMillis)*time.Millisecond)
-		defer cancel()
-	}
-
-	return pool.BorrowObjectWithContext(ctx)
-}
-
-// BorrowObjectWithContext obtains an instance from pool.
-// Instances returned from pool method will have been either newly created
-// with PooledObjectFactory.MakeObject or will be a previously
-// idle object and have been activated with
-// PooledObjectFactory.ActivateObject and then validated with
-// PooledObjectFactory.ValidateObject.
-//
-// By contract, clients must return the borrowed instance
-// using ReturnObject, InvalidateObject
-func (pool *ObjectPool) BorrowObjectWithContext(ctx context.Context) (interface{}, error) {
+func (pool *ObjectPool) BorrowObject(ctx context.Context) (interface{}, error) {
 	return pool.borrowObject(ctx)
 }
 

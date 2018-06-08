@@ -252,16 +252,17 @@ func getNthObject(num int) *TestObject {
 }
 
 func (suit *PoolTestSuite) TestBaseBorrow() {
+	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 3
-	o0, err := suit.pool.BorrowObject()
+	o0, err := suit.pool.BorrowObject(ctx)
 
 	suit.Nil(err)
 	suit.NotNil(o0)
 
 	suit.Equal(getNthObject(0), o0)
-	o1, _ := suit.pool.BorrowObject()
+	o1, _ := suit.pool.BorrowObject(ctx)
 	suit.Equal(getNthObject(1), o1)
-	o2, _ := suit.pool.BorrowObject()
+	o2, _ := suit.pool.BorrowObject(ctx)
 	suit.Equal(getNthObject(2), o2)
 }
 
@@ -280,7 +281,7 @@ func (suit *PoolTestSuite) TestBaseAddObject() {
 	if debugTest {
 		fmt.Println("test BorrowObject")
 	}
-	obj, err := suit.pool.BorrowObject()
+	obj, err := suit.pool.BorrowObject(ctx)
 	if err != nil {
 		suit.Fail(err.Error())
 	}
@@ -309,24 +310,24 @@ func (suit *PoolTestSuite) TestBaseBorrowReturn() {
 
 	suit.pool.Config.MaxTotal = 3
 
-	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(getNthObject(0), obj0)
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(getNthObject(1), obj1)
-	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(getNthObject(2), obj2)
 
 	suit.NoError(suit.pool.ReturnObject(ctx, obj2))
 
-	obj2 = suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj2 = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(getNthObject(2), obj2)
 	suit.pool.ReturnObject(ctx, obj1)
-	obj1 = suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj1 = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 
 	suit.assertEquals(getNthObject(1), obj1)
 	suit.pool.ReturnObject(ctx, obj0)
 	suit.pool.ReturnObject(ctx, obj2)
-	obj2 = suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj2 = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	if suit.isLifo() {
 		suit.assertEquals(getNthObject(2), obj2)
 	}
@@ -334,7 +335,7 @@ func (suit *PoolTestSuite) TestBaseBorrowReturn() {
 		suit.assertEquals(getNthObject(0), obj2)
 	}
 
-	obj0 = suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj0 = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	if suit.isLifo() {
 		suit.assertEquals(getNthObject(0), obj0)
 	}
@@ -344,25 +345,27 @@ func (suit *PoolTestSuite) TestBaseBorrowReturn() {
 }
 
 func (suit *PoolTestSuite) TestBorrowReturnAsync() {
-	ctx := context.Background()
-
 	suit.pool.Config.MaxTotal = 1
-	suit.pool.Config.MaxWaitMillis = 1000
 
-	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(getNthObject(0), obj0)
 
 	//start new goroutine to borrow will block
 	ch := make(chan interface{}, 1)
 	go func() {
-		obj, _ := suit.pool.BorrowObject()
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		obj, _ := suit.pool.BorrowObject(ctx)
 		ch <- obj
 	}()
 	sleep(100)
 
 	//return obj0
 	go func() {
-		suit.pool.ReturnObject(ctx, obj0)
+		suit.pool.ReturnObject(context.Background(), obj0)
 	}()
 	sleep(100)
 	obj1 := <-ch
@@ -377,10 +380,10 @@ func (suit *PoolTestSuite) TestBaseNumActiveNumIdle() {
 
 	suit.assertEquals(0, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(1, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(2, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 	suit.pool.ReturnObject(ctx, obj1)
@@ -398,8 +401,8 @@ func (suit *PoolTestSuite) TestBaseClear() {
 
 	suit.assertEquals(0, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject())
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(2, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 	suit.pool.ReturnObject(ctx, obj1)
@@ -409,7 +412,7 @@ func (suit *PoolTestSuite) TestBaseClear() {
 	suit.pool.Clear(ctx)
 	suit.assertEquals(0, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(getNthObject(2), obj2)
 }
 
@@ -420,8 +423,8 @@ func (suit *PoolTestSuite) TestBaseInvalidateObject() {
 
 	suit.assertEquals(0, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject())
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj0 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.assertEquals(2, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 	err := suit.pool.InvalidateObject(ctx, obj0)
@@ -439,12 +442,12 @@ func (suit *PoolTestSuite) TestBaseClosePool() {
 
 	suit.pool.Config.MaxTotal = 3
 
-	obj, err := suit.pool.BorrowObject()
+	obj, err := suit.pool.BorrowObject(ctx)
 	suit.NoError(err)
 	suit.pool.ReturnObject(ctx, obj)
 
 	suit.pool.Close(ctx)
-	obj, err = suit.pool.BorrowObject()
+	obj, err = suit.pool.BorrowObject(ctx)
 	suit.NotNil(err)
 	suit.Nil(obj)
 }
@@ -455,9 +458,9 @@ func (suit *PoolTestSuite) TestWhenExhaustedFail() {
 	suit.pool.Config.MaxTotal = 1
 
 	suit.pool.Config.BlockWhenExhausted = false
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 
-	err2 := suit.ErrorWithResult(suit.pool.BorrowObject())
+	err2 := suit.ErrorWithResult(suit.pool.BorrowObject(ctx))
 	_, ok := err2.(*NoSuchElementErr)
 	suit.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err2))
 
@@ -466,28 +469,29 @@ func (suit *PoolTestSuite) TestWhenExhaustedFail() {
 }
 
 func (suit *PoolTestSuite) TestWhenExhaustedBlock() {
-	ctx := context.Background()
-
 	suit.pool.Config.MaxTotal = 1
-
 	suit.pool.Config.BlockWhenExhausted = true
-	suit.pool.Config.MaxWaitMillis = int64(10)
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
 
-	err2 := suit.ErrorWithResult(suit.pool.BorrowObject())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	err2 := suit.ErrorWithResult(suit.pool.BorrowObject(ctx))
 	_, ok := err2.(*NoSuchElementErr)
 	suit.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err2))
 
 	suit.pool.ReturnObject(ctx, obj1)
 }
 
-func borrowAndWait(pool *ObjectPool, pause time.Duration) chan int {
-	ctx := context.Background()
-
+func borrowAndWait(ctx context.Context, pool *ObjectPool, pause time.Duration) chan int {
 	ch := make(chan int, 1)
 	go func() {
 		preborrow := currentTimeMillis()
-		obj, _ := pool.BorrowObject()
+		obj, _ := pool.BorrowObject(ctx)
 		//objectId = obj;
 		postborrow := currentTimeMillis()
 		ch <- int(postborrow - preborrow)
@@ -506,24 +510,20 @@ func (suit *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 	suit.pool.Config.MaxTotal = 1
 
 	suit.pool.Config.BlockWhenExhausted = true
-	suit.pool.Config.MaxWaitMillis = int64(-1)
 
-	obj1, _ := suit.pool.BorrowObject()
+	obj1, _ := suit.pool.BorrowObject(ctx)
 
 	// Make sure on object was obtained
 	suit.assertNotNil(obj1)
 
 	// Create a separate goroutine to try and borrow another object
 	//WaitingTestGoroutine wtt = new WaitingTestGoroutine(pool, 200000);
-	ch := borrowAndWait(suit.pool, time.Duration(200000)*time.Millisecond)
+	ch := borrowAndWait(ctx, suit.pool, 200000*time.Millisecond)
 
 	// Give wtt time to start
-	time.Sleep(time.Duration(200) * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	suit.pool.idleObjects.InterruptTakeWaiters()
-
-	// Give interrupt time to take effect
-	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	borrowTime := <-ch
 	close(ch)
@@ -539,10 +539,11 @@ func (suit *PoolTestSuite) TestWhenExhaustedBlockInterrupt() {
 	suit.pool.ReturnObject(ctx, obj1)
 
 	// Bug POOL-162 - check there is now an object in the pool
-	suit.pool.Config.MaxWaitMillis = int64(10)
-	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
-	suit.pool.ReturnObject(ctx, obj2)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
 
+	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	suit.pool.ReturnObject(ctx, obj2)
 }
 
 func (suit *PoolTestSuite) TestEvictWhileEmpty() {
@@ -561,6 +562,8 @@ type TestGoroutineArg struct {
 
 	/** delay before each borrow attempt */
 	startDelay int
+
+	borrowTimeout time.Duration
 
 	/** time to hold each borrowed object before returning it */
 	holdTime int
@@ -584,12 +587,20 @@ type TestGoroutineResult struct {
 }
 
 func NewTesGoroutineArgSimple(pool *ObjectPool, iter int, delay int, randomDelay bool) *TestGoroutineArg {
-	return NewTestGoroutineArg(pool, iter, delay, delay, randomDelay, nil)
+	return NewTestGoroutineArg(pool, iter, delay, time.Duration(0), delay, randomDelay, nil)
 }
 
-func NewTestGoroutineArg(pool *ObjectPool, iter int, startDelay int,
+func NewTestGoroutineArg(pool *ObjectPool, iter int, startDelay int, borrowTimeout time.Duration,
 	holdTime int, randomDelay bool, obj interface{}) *TestGoroutineArg {
-	return &TestGoroutineArg{pool: pool, iter: iter, startDelay: startDelay, holdTime: holdTime, randomDelay: randomDelay, expectedObject: obj}
+	return &TestGoroutineArg{
+		pool:           pool,
+		iter:           iter,
+		startDelay:     startDelay,
+		borrowTimeout:  borrowTimeout,
+		holdTime:       holdTime,
+		randomDelay:    randomDelay,
+		expectedObject: obj,
+	}
 }
 
 func goroutineRun(ctx context.Context, arg *TestGoroutineArg) chan TestGoroutineResult {
@@ -611,7 +622,13 @@ func goroutineRun(ctx context.Context, arg *TestGoroutineArg) chan TestGoroutine
 			}
 			sleep(startDelay)
 			startBorrow := currentTimeMillis()
-			obj, err := arg.pool.BorrowObject()
+			borrowCtx := ctx
+			if arg.borrowTimeout > 0 {
+				var borrowCancel func()
+				borrowCtx, borrowCancel = context.WithTimeout(ctx, arg.borrowTimeout)
+				defer borrowCancel()
+			}
+			obj, err := arg.pool.BorrowObject(borrowCtx)
 			endBorrow := currentTimeMillis()
 			if err != nil {
 				if debugTest {
@@ -653,7 +670,7 @@ func (suit *PoolTestSuite) TestEvictAddObjects() {
 	suit.factory.maxTotal = 2
 	suit.pool.Config.MaxTotal = 2
 	suit.pool.Config.MinIdle = 1
-	suit.pool.BorrowObject() // numActive = 1, numIdle = 0
+	suit.pool.BorrowObject(ctx) // numActive = 1, numIdle = 0
 	// Create a test goroutine that will run once and try a borrow after
 	// 150ms fixed delay
 	borrower := NewTesGoroutineArgSimple(suit.pool, 1, 150, false)
@@ -742,7 +759,7 @@ func (suit *PoolTestSuite) checkEvictionOrderPart1(ctx context.Context, lifo boo
 	}
 	// Order, oldest to youngest, is "0", "1", ...,"4"
 	suit.pool.evict(ctx) // Should evict "0" and "1"
-	obj, _ := suit.pool.BorrowObject()
+	obj, _ := suit.pool.BorrowObject(ctx)
 	suit.True(getNthObject(0) != obj, "oldest not evicted")
 	suit.True(getNthObject(1) != obj, "second oldest not evicted")
 	// 2 should be next out for FIFO, 4 for LIFO
@@ -766,7 +783,7 @@ func (suit *PoolTestSuite) checkEvictionOrderPart2(ctx context.Context, lifo boo
 	}
 	suit.pool.evict(ctx) // Should evict "0" and "1"
 	suit.pool.evict(ctx) // Should evict "2" and "3"
-	obj, _ := suit.pool.BorrowObject()
+	obj, _ := suit.pool.BorrowObject(ctx)
 	suit.Equal(getNthObject(4), obj, "Wrong instance remaining in pool")
 }
 
@@ -781,21 +798,23 @@ func (suit *PoolTestSuite) checkEvictorVisiting(lifo bool) {
 
 func (suit *PoolTestSuite) TestExceptionOnPassivateDuringReturn() {
 	ctx := context.Background()
-	obj, _ := suit.pool.BorrowObject()
+	obj, _ := suit.pool.BorrowObject(ctx)
 	suit.factory.exceptionOnPassivate = true
 	suit.pool.ReturnObject(ctx, obj)
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 }
 
 func (suit *PoolTestSuite) TestExceptionOnPassivateDuringReturnWithBorrowWaiting() {
+	ctx := context.Background()
+
 	suit.pool.Config.MaxTotal = 1
 	suit.pool.Config.BlockWhenExhausted = true
 	suit.factory.exceptionOnPassivate = true
 
-	obj, _ := suit.pool.BorrowObject()
+	obj, _ := suit.pool.BorrowObject(ctx)
 
 	goBorrow := func(ch chan<- interface{}, pool *ObjectPool) {
-		obj, _ := suit.pool.BorrowObject()
+		obj, _ := suit.pool.BorrowObject(ctx)
 		ch <- obj
 	}
 
@@ -815,8 +834,6 @@ func (suit *PoolTestSuite) TestExceptionOnPassivateDuringReturnWithBorrowWaiting
 	case <-time.After(100 * time.Millisecond):
 		// Just wait a moment to make sure neither of those channels, above, read...
 	}
-
-	ctx := context.Background()
 
 	suit.pool.ReturnObject(ctx, obj)
 
@@ -854,21 +871,23 @@ func (suit *PoolTestSuite) TestExceptionOnPassivateDuringReturnWithBorrowWaiting
 }
 
 func (suit *PoolTestSuite) TestExceptionOnDestroyDuringBorrow() {
+	ctx := context.Background()
 	suit.factory.exceptionOnDestroy = true
 	suit.pool.Config.TestOnBorrow = true
-	suit.pool.BorrowObject()
+	suit.pool.BorrowObject(ctx)
 	suit.factory.setValid(false) // Make validation fail on next borrow attempt
-	_, err := suit.pool.BorrowObject()
+	_, err := suit.pool.BorrowObject(ctx)
 	suit.NotNil(err)
 	suit.assertEquals(1, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 }
 
 func (suit *PoolTestSuite) TestExceptionOnDestroyDuringReturn() {
+	ctx := context.Background()
 	suit.factory.exceptionOnDestroy = true
 	suit.pool.Config.TestOnReturn = true
-	obj1, _ := suit.pool.BorrowObject()
-	suit.pool.BorrowObject()
+	obj1, _ := suit.pool.BorrowObject(ctx)
+	suit.pool.BorrowObject(ctx)
 	suit.factory.setValid(false) // Make validation fail
 	suit.pool.ReturnObject(context.Background(), obj1)
 	suit.assertEquals(1, suit.pool.GetNumActive())
@@ -876,16 +895,16 @@ func (suit *PoolTestSuite) TestExceptionOnDestroyDuringReturn() {
 }
 
 func (suit *PoolTestSuite) TestExceptionOnActivateDuringBorrow() {
-	obj1, _ := suit.pool.BorrowObject()
-	obj2, _ := suit.pool.BorrowObject()
 	ctx := context.Background()
+	obj1, _ := suit.pool.BorrowObject(ctx)
+	obj2, _ := suit.pool.BorrowObject(ctx)
 	suit.pool.ReturnObject(ctx, obj1)
 	suit.pool.ReturnObject(ctx, obj2)
 	suit.factory.exceptionOnActivate = true
 	suit.factory.evenValid = false
 	// Activation will now throw every other time
 	// First attempt throws, but loop continues and second succeeds
-	obj, _ := suit.pool.BorrowObject()
+	obj, _ := suit.pool.BorrowObject(ctx)
 	suit.assertEquals(1, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
 
@@ -893,7 +912,7 @@ func (suit *PoolTestSuite) TestExceptionOnActivateDuringBorrow() {
 	suit.factory.setValid(false)
 	// Validation will now fail on activation when borrowObject returns
 	// an idle instance, and then when attempting to create a new instance
-	_, err := suit.pool.BorrowObject()
+	_, err := suit.pool.BorrowObject(ctx)
 	_, ok := err.(*NoSuchElementErr)
 	suit.True(ok, "expect NoSuchElementErr but get", reflect.TypeOf(err))
 
@@ -902,19 +921,21 @@ func (suit *PoolTestSuite) TestExceptionOnActivateDuringBorrow() {
 }
 
 func (suit *PoolTestSuite) TestNegativeMaxTotal() {
+	ctx := context.Background()
 	suit.pool.Config.MaxTotal = -1
 	suit.pool.Config.BlockWhenExhausted = false
-	obj, _ := suit.pool.BorrowObject()
+	obj, _ := suit.pool.BorrowObject(ctx)
 	suit.assertEquals(getNthObject(0), obj)
 	suit.pool.ReturnObject(context.Background(), obj)
 }
 
 func (suit *PoolTestSuite) TestMaxIdle() {
+	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 100
 	suit.pool.Config.MaxIdle = 8
 	active := make([]*TestObject, 100)
 	for i := 0; i < 100; i++ {
-		obj, err := suit.pool.BorrowObject()
+		obj, err := suit.pool.BorrowObject(ctx)
 		suit.NoError(err)
 		testObj := obj.(*TestObject)
 		suit.NotNil(testObj)
@@ -922,7 +943,6 @@ func (suit *PoolTestSuite) TestMaxIdle() {
 	}
 	suit.assertEquals(100, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	ctx := context.Background()
 	for i := 0; i < 100; i++ {
 		obj := active[i]
 		if debugTest {
@@ -940,11 +960,12 @@ func (suit *PoolTestSuite) TestMaxIdle() {
 }
 
 func (suit *PoolTestSuite) TestMaxIdleZero() {
+	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 100
 	suit.pool.Config.MaxIdle = 0
 	active := make([]*TestObject, 100)
 	for i := 0; i < 100; i++ {
-		obj, err := suit.pool.BorrowObject()
+		obj, err := suit.pool.BorrowObject(ctx)
 		suit.NoError(err)
 		testObj := obj.(*TestObject)
 		suit.NotNil(testObj)
@@ -952,7 +973,6 @@ func (suit *PoolTestSuite) TestMaxIdleZero() {
 	}
 	suit.assertEquals(100, suit.pool.GetNumActive())
 	suit.assertEquals(0, suit.pool.GetNumIdle())
-	ctx := context.Background()
 	for i := 0; i < 100; i++ {
 		suit.pool.ReturnObject(ctx, active[i])
 		suit.assertEquals(99-i, suit.pool.GetNumActive())
@@ -961,38 +981,46 @@ func (suit *PoolTestSuite) TestMaxIdleZero() {
 }
 
 func (suit *PoolTestSuite) TestMaxTotal() {
+	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 3
 	suit.pool.Config.BlockWhenExhausted = false
 
-	suit.NoErrorWithResult(suit.pool.BorrowObject())
-	suit.NoErrorWithResult(suit.pool.BorrowObject())
-	suit.NoErrorWithResult(suit.pool.BorrowObject())
-	_, err := suit.pool.BorrowObject()
+	suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	_, err := suit.pool.BorrowObject(ctx)
 	suit.Error(err)
 }
 
 func (suit *PoolTestSuite) TestTimeoutNoLeak() {
 	suit.pool.Config.MaxTotal = 2
-	suit.pool.Config.MaxWaitMillis = int64(10)
 	suit.pool.Config.BlockWhenExhausted = true
-	obj, err := suit.pool.BorrowObject()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	obj, err := suit.pool.BorrowObject(ctx)
 	suit.NoError(err)
-	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
-	err3 := suit.ErrorWithResult(suit.pool.BorrowObject())
+
+	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	err3 := suit.ErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.IsType(&NoSuchElementErr{}, err3, err3)
 
-	ctx := context.Background()
+	ctx, cancel2 := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel2()
+
 	suit.NoError(suit.pool.ReturnObject(ctx, obj2))
 	suit.NoError(suit.pool.ReturnObject(ctx, obj))
 
-	suit.NoErrorWithResult(suit.pool.BorrowObject())
-	suit.NoErrorWithResult(suit.pool.BorrowObject())
+	suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+	suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 }
 
 func (suit *PoolTestSuite) TestMaxTotalZero() {
+	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 0
 	suit.pool.Config.BlockWhenExhausted = false
-	err := suit.ErrorWithResult(suit.pool.BorrowObject())
+	err := suit.ErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Error(err)
 	//fail("Expected NoSuchElementException");
 }
@@ -1027,7 +1055,7 @@ func (suit *PoolTestSuite) TestMaxTotalUnderLoad() {
 		var obj interface{}
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 
-		obj, err := suit.pool.BorrowObject()
+		obj, err := suit.pool.BorrowObject(ctx)
 		suit.NoError(err)
 		// Under load, observed _numActive > _maxTotal
 		if suit.pool.GetNumActive() > suit.pool.Config.MaxTotal {
@@ -1062,7 +1090,7 @@ func (suit *PoolTestSuite) TestStartAndStopEvictor() {
 		{
 			active := make([]*TestObject, 6)
 			for i := 0; i < 6; i++ {
-				active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+				active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 			}
 			for i := 0; i < 6; i++ {
 				suit.NoError(suit.pool.ReturnObject(ctx, active[i]))
@@ -1112,7 +1140,7 @@ func (suit *PoolTestSuite) TestStartAndStopEvictorConcurrent() {
 			// populate the pool
 			active := make([]*TestObject, 6)
 			for i := 0; i < 6; i++ {
-				active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+				active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 			}
 			for i := 0; i < 6; i++ {
 				suit.NoError(suit.pool.ReturnObject(ctx, active[i]))
@@ -1144,7 +1172,7 @@ func (suit *PoolTestSuite) TestEvictionWithNegativeNumTests() {
 
 	active := make([]*TestObject, 6)
 	for i := 0; i < 6; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 	for i := 0; i < 6; i++ {
 		suit.NoError(suit.pool.ReturnObject(ctx, active[i]))
@@ -1173,7 +1201,7 @@ func (suit *PoolTestSuite) TestEviction() {
 	active := make([]*TestObject, 500)
 
 	for i := 0; i < 500; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 	for i := 0; i < 500; i++ {
 		suit.NoError(suit.pool.ReturnObject(ctx, active[i]))
@@ -1193,7 +1221,7 @@ func (suit *PoolTestSuite) TestEviction() {
 	suit.Equal(0, suit.pool.GetNumIdle(), "Should be zero idle, found %v", suit.pool.GetNumIdle())
 
 	for i := 0; i < 500; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 	for i := 0; i < 500; i++ {
 		suit.NoError(suit.pool.ReturnObject(ctx, active[i]))
@@ -1244,11 +1272,11 @@ func (suit *PoolTestSuite) TestEvictionPolicy() {
 	suit.pool.Config.EvictionPolicyName = TestEvictionPolicyName
 	suit.Equal(evictionPolicy, suit.pool.getEvictionPolicy())
 
+	ctx := context.Background()
 	active := make([]*TestObject, 500)
 	for i := 0; i < 500; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
-	ctx := context.Background()
 	for i := 0; i < 500; i++ {
 		suit.NoError(suit.pool.ReturnObject(ctx, active[i]))
 	}
@@ -1272,12 +1300,12 @@ func (suit *PoolTestSuite) TestEvictionSoftMinIdle() {
 	suit.pool.Config.SoftMinEvictableIdleTimeMillis = int64(1000)
 	suit.pool.Config.MinIdle = 2
 
+	ctx := context.Background()
 	active := make([]*TestObject, 5)
 	for i := 0; i < 5; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 
-	ctx := context.Background()
 	for i := 0; i < 5; i++ {
 		suit.pool.ReturnObject(ctx, active[i])
 	}
@@ -1314,7 +1342,7 @@ func (suit *PoolTestSuite) TestEvictionInvalid() {
 	suit.pool.Config.MinEvictableIdleTimeMillis = int64(100000)
 	suit.pool.Config.NumTestsPerEvictionRun = 1
 
-	p := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	p := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.NoError(suit.pool.ReturnObject(ctx, p))
 
 	// Run eviction in a separate goroutine
@@ -1349,7 +1377,7 @@ func (suit *PoolTestSuite) TestConcurrentInvalidate() {
 	suit.pool.Config.MaxIdle = nObjects
 	active := make([]*TestObject, nObjects)
 	for i := 0; i < nObjects; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 	for i := 0; i < nObjects; i++ {
 		if i%2 == 0 {
@@ -1410,12 +1438,12 @@ func (suit *PoolTestSuite) TestMinIdle() {
 	suit.Equal(5, suit.pool.GetNumIdle(), "Should be 5 idle, found %v", suit.pool.GetNumIdle())
 
 	active := make([]*TestObject, 5)
-	active[0] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+	active[0] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	sleep(150)
 	suit.Equal(5, suit.pool.GetNumIdle(), "Should be 5 idle, found %v", suit.pool.GetNumIdle())
 
 	for i := 1; i < 5; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 
 	sleep(150)
@@ -1447,7 +1475,7 @@ func (suit *PoolTestSuite) TestMinIdleMaxTotal() {
 	suit.Equal(5, suit.pool.GetNumIdle(), "Should be 5 idle, found %v", suit.pool.GetNumIdle())
 
 	for i := 0; i < 5; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 	sleep(150)
 	suit.Equal(5, suit.pool.GetNumIdle(), "Should be 5 idle, found %v", suit.pool.GetNumIdle())
@@ -1459,7 +1487,7 @@ func (suit *PoolTestSuite) TestMinIdleMaxTotal() {
 	suit.Equal(10, suit.pool.GetNumIdle(), "Should be 10 idle, found %v", suit.pool.GetNumIdle())
 
 	for i := 0; i < 10; i++ {
-		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*TestObject)
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
 	}
 	sleep(150)
 	suit.Equal(0, suit.pool.GetNumIdle(), "Should be 0 idle, found %v", suit.pool.GetNumIdle())
@@ -1471,8 +1499,8 @@ func (suit *PoolTestSuite) TestMinIdleMaxTotal() {
 	suit.Equal(10, suit.pool.GetNumIdle(), "Should be 10 idle, found %v", suit.pool.GetNumIdle())
 }
 
-func runTestGoroutines(ctx context.Context, t *testing.T, numGoroutines int, iterations int, delay int, testPool *ObjectPool) {
-	arg := NewTestGoroutineArg(testPool, iterations, delay, delay, true, nil)
+func runTestGoroutines(ctx context.Context, t *testing.T, numGoroutines int, iterations int, delay int, borrowTimeout time.Duration, testPool *ObjectPool) {
+	arg := NewTestGoroutineArg(testPool, iterations, delay, borrowTimeout, delay, true, nil)
 	resultChans := make([]chan TestGoroutineResult, numGoroutines)
 	for i := 0; i < numGoroutines; i++ {
 		resultChans[i] = goroutineRun(ctx, arg)
@@ -1500,9 +1528,8 @@ func runTestGoroutines(ctx context.Context, t *testing.T, numGoroutines int, ite
 func (suit *PoolTestSuite) TestGoroutineed1() {
 	suit.pool.Config.MaxTotal = 15
 	suit.pool.Config.MaxIdle = 15
-	suit.pool.Config.MaxWaitMillis = int64(1000)
 	ctx := context.Background()
-	runTestGoroutines(ctx, suit.T(), 20, 100, 50, suit.pool)
+	runTestGoroutines(ctx, suit.T(), 20, 100, 50, 1*time.Second, suit.pool)
 }
 
 func (suit *PoolTestSuite) TestMaxTotalInvariant() {
@@ -1514,16 +1541,15 @@ func (suit *PoolTestSuite) TestMaxTotalInvariant() {
 	suit.pool.Config.MaxTotal = maxTotal
 	suit.pool.Config.MaxIdle = -1
 	suit.pool.Config.TestOnReturn = true
-	suit.pool.Config.MaxWaitMillis = int64(1000)
 	ctx := context.Background()
-	runTestGoroutines(ctx, suit.T(), 5, 10, 50, suit.pool)
+	runTestGoroutines(ctx, suit.T(), 5, 10, 50, 1*time.Second, suit.pool)
 }
 
 func concurrentBorrowAndEvictGoroutine(ctx context.Context, borrow bool, pool *ObjectPool) chan interface{} {
 	ch := make(chan interface{}, 1)
 	go func(borrow bool, pool *ObjectPool) {
 		if borrow {
-			obj, _ := pool.BorrowObject()
+			obj, _ := pool.BorrowObject(ctx)
 			ch <- obj
 		} else {
 			pool.evict(ctx)
@@ -1537,10 +1563,11 @@ func (suit *PoolTestSuite) TestConcurrentBorrowAndEvict() {
 	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 1
 	suit.NoError(suit.pool.AddObject(ctx))
-	//set MaxWaitMillis avoid test use too long time
-	suit.pool.Config.MaxWaitMillis = 1000
 
 	for i := 0; i < 5000; i++ {
+		ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		defer cancel()
+
 		one := concurrentBorrowAndEvictGoroutine(ctx, true, suit.pool)
 		two := concurrentBorrowAndEvictGoroutine(ctx, false, suit.pool)
 
@@ -1568,22 +1595,20 @@ func (suit *PoolTestSuite) TestNoInstanceOverlap() {
 	suit.pool.Config.MaxIdle = maxTotal
 	suit.pool.Config.TestOnBorrow = true
 	suit.pool.Config.BlockWhenExhausted = true
-	suit.pool.Config.MaxWaitMillis = int64(-1)
 	ctx := context.Background()
-	runTestGoroutines(ctx, suit.T(), numGoroutines, iterations, delay, suit.pool)
+	runTestGoroutines(ctx, suit.T(), numGoroutines, iterations, delay, time.Duration(0), suit.pool)
 	suit.Equal(0, suit.pool.GetDestroyedByBorrowValidationCount())
 }
 
 func (suit *PoolTestSuite) TestWhenExhaustedBlockClosePool() {
 	suit.pool.Config.MaxTotal = 1
 	suit.pool.Config.BlockWhenExhausted = true
-	suit.pool.Config.MaxWaitMillis = int64(-1)
-	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+
+	ctx := context.Background()
+	obj1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 
 	// Make sure an object was obtained
 	suit.NotNil(obj1)
-
-	ctx := context.Background()
 
 	// Create a separate goroutine to try and borrow another object
 	ch := waitTestGoroutine(ctx, suit.pool, 200)
@@ -1607,7 +1632,7 @@ func waitTestGoroutine(ctx context.Context, pool *ObjectPool, pause int) chan Te
 	go func() {
 		result := TestGoroutineResult{}
 		result.preborrow = currentTimeMillis()
-		obj, err := pool.BorrowObject()
+		obj, err := pool.BorrowObject(ctx)
 		result.objectID = obj
 		result.postborrow = currentTimeMillis()
 		if err == nil {
@@ -1630,14 +1655,14 @@ func (suit *PoolTestSuite) TestFIFO() {
 	suit.NoError(suit.pool.AddObject(ctx)) // "0"
 	suit.NoError(suit.pool.AddObject(ctx)) // "1"
 	suit.NoError(suit.pool.AddObject(ctx)) // "2"
-	suit.Equal(getNthObject(0), suit.NoErrorWithResult(suit.pool.BorrowObject()), "Oldest")
-	suit.Equal(getNthObject(1), suit.NoErrorWithResult(suit.pool.BorrowObject()), "Middle")
-	suit.Equal(getNthObject(2), suit.NoErrorWithResult(suit.pool.BorrowObject()), "Youngest")
-	o := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	suit.Equal(getNthObject(0), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "Oldest")
+	suit.Equal(getNthObject(1), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "Middle")
+	suit.Equal(getNthObject(2), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "Youngest")
+	o := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Equal(getNthObject(3), o, "new-3")
 	suit.NoError(suit.pool.ReturnObject(ctx, o))
-	suit.Equal(o, suit.NoErrorWithResult(suit.pool.BorrowObject()), "returned-3")
-	suit.Equal(getNthObject(4), suit.NoErrorWithResult(suit.pool.BorrowObject()), "new-4")
+	suit.Equal(o, suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "returned-3")
+	suit.Equal(getNthObject(4), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "new-4")
 }
 
 func (suit *PoolTestSuite) TestLIFO() {
@@ -1646,14 +1671,14 @@ func (suit *PoolTestSuite) TestLIFO() {
 	suit.NoError(suit.pool.AddObject(ctx)) // "0"
 	suit.NoError(suit.pool.AddObject(ctx)) // "1"
 	suit.NoError(suit.pool.AddObject(ctx)) // "2"
-	suit.Equal(getNthObject(2), suit.NoErrorWithResult(suit.pool.BorrowObject()), "Youngest")
-	suit.Equal(getNthObject(1), suit.NoErrorWithResult(suit.pool.BorrowObject()), "Middle")
-	suit.Equal(getNthObject(0), suit.NoErrorWithResult(suit.pool.BorrowObject()), "Oldest")
-	o := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	suit.Equal(getNthObject(2), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "Youngest")
+	suit.Equal(getNthObject(1), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "Middle")
+	suit.Equal(getNthObject(0), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "Oldest")
+	o := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Equal(getNthObject(3), o, "new-3")
 	suit.NoError(suit.pool.ReturnObject(ctx, o))
-	suit.Equal(o, suit.NoErrorWithResult(suit.pool.BorrowObject()), "returned-3")
-	suit.Equal(getNthObject(4), suit.NoErrorWithResult(suit.pool.BorrowObject()), "new-4")
+	suit.Equal(o, suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "returned-3")
+	suit.Equal(getNthObject(4), suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)), "new-4")
 }
 
 func (suit *PoolTestSuite) TestAddObject() {
@@ -1662,7 +1687,7 @@ func (suit *PoolTestSuite) TestAddObject() {
 	suit.NoError(suit.pool.AddObject(ctx))
 	suit.Equal(1, suit.pool.GetNumIdle(), "should be one idle")
 	suit.Equal(0, suit.pool.GetNumActive(), "should be zero active")
-	obj := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Equal(0, suit.pool.GetNumIdle(), "should be zero idle")
 	suit.Equal(1, suit.pool.GetNumActive(), "should be one active")
 	suit.NoError(suit.pool.ReturnObject(ctx, obj))
@@ -1685,10 +1710,12 @@ func (suit *PoolTestSuite) TestBrokenFactoryShouldNotBlockPool() {
 	suit.pool.Config.BlockWhenExhausted = true
 	suit.pool.Config.TestOnBorrow = true
 
+	ctx := context.Background()
+
 	// First borrow object will need to create a new object which will fail
 	// validation.
 	suit.factory.setValid(false)
-	obj, ex := suit.pool.BorrowObject()
+	obj, ex := suit.pool.BorrowObject(ctx)
 	// Failure expected
 	_, ok := ex.(*NoSuchElementErr)
 	suit.True(ok, "expect NoSuchElementErr, but get: %v", reflect.TypeOf(ex))
@@ -1698,8 +1725,7 @@ func (suit *PoolTestSuite) TestBrokenFactoryShouldNotBlockPool() {
 	suit.factory.setValid(true)
 
 	// Subsequent borrows should be OK
-	obj = suit.NoErrorWithResult(suit.pool.BorrowObject())
-	ctx := context.Background()
+	obj = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.NoError(suit.pool.ReturnObject(ctx, obj))
 }
 
@@ -1716,13 +1742,13 @@ func (suit *PoolTestSuite) TestMaxWaitMultiGoroutineed() {
 	holdTime := 2 * maxWait // how long to hold connection
 	goroutines := 10        // number of goroutines to grab the object initially
 	suit.pool.Config.BlockWhenExhausted = true
-	suit.pool.Config.MaxWaitMillis = int64(maxWait)
 	suit.pool.Config.MaxTotal = goroutines
 	// Create enough goroutines so half the goroutines will have to wait
 	resultChans := make([]chan TestGoroutineResult, goroutines*2)
-	ctx := context.Background()
 	origin := currentTimeMillis() - 1000
 	for i := 0; i < len(resultChans); i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(maxWait)*time.Millisecond)
+		defer cancel()
 		resultChans[i] = waitTestGoroutine(ctx, suit.pool, holdTime)
 	}
 	failed := 0
@@ -1772,7 +1798,7 @@ func (suit *PoolTestSuite) TestMakeConcurrentWithReturn() {
 	sleep(50) // wait for validation to succeed
 	// Slow down validation and borrow an instance
 	suit.factory.setValidateLatency(400)
-	instance := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	instance := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	// Now make sure that we have not leaked an instance
 	suit.Equal(suit.factory.makeCounter, suit.pool.GetNumIdle()+1)
 	suit.NoError(suit.pool.ReturnObject(ctx, instance))
@@ -1788,19 +1814,27 @@ func (suit *PoolTestSuite) TestMakeConcurrentWithReturn() {
  * JIRA: POOL-240
  */
 func (suit *PoolTestSuite) TestInvalidateFreesCapacity() {
-	ctx := context.Background()
 	suit.pool.Config.MaxTotal = 2
-	suit.pool.Config.MaxWaitMillis = 500
 	suit.pool.Config.BlockWhenExhausted = true
+
 	// Borrow an instance and hold if for 5 seconds
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
 	ch1 := waitTestGoroutine(ctx, suit.pool, 5000)
+
 	// Borrow another instance
-	obj := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	ctx, cancel = context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	obj := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
+
 	// Launch another goroutine - will block, but fail in 500 ms
+	ctx, cancel = context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
 	ch2 := waitTestGoroutine(ctx, suit.pool, 100)
+
 	// Invalidate the object borrowed by suit goroutine - should allow goroutine2 to create
 	sleep(20)
-	suit.NoError(suit.pool.InvalidateObject(ctx, obj))
+	suit.NoError(suit.pool.InvalidateObject(context.Background(), obj))
 	sleep(600) // Wait for goroutine2 to timeout
 	result2 := <-ch2
 	close(ch2)
@@ -1823,17 +1857,26 @@ func (suit *PoolTestSuite) TestValidationFailureOnReturnFreesCapacity() {
 	suit.factory.setValid(false) // Validate will always fail
 	suit.factory.enableValidation = true
 	suit.pool.Config.MaxTotal = 2
-	suit.pool.Config.MaxWaitMillis = int64(1500)
 	suit.pool.Config.TestOnReturn = true
 	suit.pool.Config.TestOnBorrow = false
+
 	// Borrow an instance and hold if for 5 seconds
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
 	ch1 := waitTestGoroutine(ctx, suit.pool, 5000)
+
 	// Borrow another instance and return it after 500 ms (validation will fail)
+	ctx, cancel = context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
 	ch2 := waitTestGoroutine(ctx, suit.pool, 500)
 	sleep(50)
+
 	// Try to borrow an object
-	obj := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	ctx, cancel = context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	obj := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.NoError(suit.pool.ReturnObject(ctx, obj))
+
 	<-ch1
 	close(ch1)
 	<-ch2
@@ -1851,7 +1894,7 @@ func (suit *PoolTestSuite) TestMultipleReturnOfSameObject() {
 	suit.Equal(0, suit.pool.GetNumActive())
 	suit.Equal(0, suit.pool.GetNumIdle())
 
-	obj := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 
 	suit.Equal(1, suit.pool.GetNumActive())
 	suit.Equal(0, suit.pool.GetNumIdle())
@@ -1882,14 +1925,14 @@ func (suit *PoolTestSuite) TestValidationOnCreateOnly() {
 
 	ctx := context.Background()
 
-	o1 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	o1 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Equal(getNthObject(0), o1)
 	go func() {
 		sleep(3000)
 		suit.pool.ReturnObject(ctx, o1)
 	}()
 
-	o2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	o2 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Equal(getNthObject(0), o2)
 
 	suit.Equal(1, suit.factory.validateCounter)
@@ -1906,8 +1949,8 @@ func (suit *PoolTestSuite) TestEqualsIndiscernible() {
 	pool := NewObjectPoolWithDefaultConfig(ctx, NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
 		return make(map[string]string), nil
 	}))
-	m1 := suit.NoErrorWithResult(pool.BorrowObject())
-	m2 := suit.NoErrorWithResult(pool.BorrowObject())
+	m1 := suit.NoErrorWithResult(pool.BorrowObject(ctx))
+	m2 := suit.NoErrorWithResult(pool.BorrowObject(ctx))
 	suit.NoError(pool.ReturnObject(ctx, m1))
 	suit.NoError(pool.ReturnObject(ctx, m2))
 	pool.Close(ctx)
@@ -1924,8 +1967,8 @@ func (suit *PoolTestSuite) TestMutable() {
 	pool := NewObjectPoolWithDefaultConfig(ctx, NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
 		return make(map[string]string), nil
 	}))
-	m1 := suit.NoErrorWithResult(pool.BorrowObject()).(map[string]string)
-	m2 := suit.NoErrorWithResult(pool.BorrowObject()).(map[string]string)
+	m1 := suit.NoErrorWithResult(pool.BorrowObject(ctx)).(map[string]string)
+	m2 := suit.NoErrorWithResult(pool.BorrowObject(ctx)).(map[string]string)
 	m1["k1"] = "v1"
 	m2["k2"] = "v2"
 	suit.NoError(pool.ReturnObject(ctx, m1))
@@ -1986,7 +2029,7 @@ func (suit *PoolTestSuite) TestPreparePool() {
 	suit.pool.Config.MaxTotal = 1
 	suit.pool.PreparePool(ctx)
 	suit.Equal(1, suit.pool.GetNumIdle())
-	obj := suit.NoErrorWithResult(suit.pool.BorrowObject())
+	obj := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.pool.PreparePool(ctx)
 	suit.Equal(0, suit.pool.GetNumIdle())
 	suit.pool.Config.MinIdle = 0

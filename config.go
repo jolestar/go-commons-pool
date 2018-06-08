@@ -20,8 +20,6 @@ const (
 	// TODO
 	// DEFAULT_FAIRNESS = false
 
-	// DefaultMaxWaitMillis is the default value of ObjectPoolConfig.MaxWaitMillis
-	DefaultMaxWaitMillis = int64(-1)
 	// DefaultMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.MinEvictableIdleTimeMillis
 	DefaultMinEvictableIdleTimeMillis = int64(1000 * 60 * 30)
 	// DefaultSoftMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.SoftMinEvictableIdleTimeMillis
@@ -138,16 +136,6 @@ type ObjectPoolConfig struct {
 	//Fairness                       bool
 
 	/**
-	 * The maximum amount of time (in milliseconds) the
-	 * ObjectPool.BorrowObject() method should block before return
-	 * a error when the pool is exhausted and
-	 *  BlockWhenExhausted is true. When less than 0, the
-	 * ObjectPool.BorrowObject() method may block indefinitely.
-	 *
-	 */
-	MaxWaitMillis int64
-
-	/**
 	 * The minimum amount of time an object may sit idle in the pool
 	 * before it is eligible for eviction by the idle object evictor (if any -
 	 * see TimeBetweenEvictionRunsMillis . When non-positive,
@@ -206,7 +194,6 @@ func NewDefaultPoolConfig() *ObjectPoolConfig {
 		MaxTotal:                       DefaultMaxTotal,
 		MaxIdle:                        DefaultMaxIdle,
 		MinIdle:                        DefaultMinIdle,
-		MaxWaitMillis:                  DefaultMaxWaitMillis,
 		MinEvictableIdleTimeMillis:     DefaultMinEvictableIdleTimeMillis,
 		SoftMinEvictableIdleTimeMillis: DefaultSoftMinEvictableIdleTimeMillis,
 		NumTestsPerEvictionRun:         DefaultNumTestsPerEvictionRun,

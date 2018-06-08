@@ -21,7 +21,7 @@ func TestExample(t *testing.T) {
 			func(context.Context) (interface{}, error) {
 				return &MyPoolObject{}, nil
 			}))
-	obj, _ := p.BorrowObject()
+	obj, _ := p.BorrowObject(ctx)
 	p.ReturnObject(ctx, obj)
 }
 
@@ -57,7 +57,7 @@ func TestCustomFactoryExample(t *testing.T) {
 
 	ctx := context.Background()
 	p := NewObjectPoolWithDefaultConfig(ctx, new(MyObjectFactory))
-	obj, _ := p.BorrowObject()
+	obj, _ := p.BorrowObject(ctx)
 	p.ReturnObject(ctx, obj)
 }
 
@@ -71,7 +71,7 @@ func TestStringExample(t *testing.T) {
 			*stringPointer = "hello"
 			return stringPointer, nil
 		}))
-	obj, _ := p.BorrowObject()
+	obj, _ := p.BorrowObject(ctx)
 	fmt.Println(obj)
 	assert.Equal(t, "hello", *obj.(*string))
 	p.ReturnObject(ctx, obj)
@@ -82,7 +82,7 @@ func TestStringExample(t *testing.T) {
 //		func() (interface{}, error) {
 //			return "hello", nil
 //		}))
-//	obj, _ := p.BorrowObject()
+//	obj, _ := p.BorrowObject(ctx)
 //	p.ReturnObject(obj)
 //}
 //
@@ -91,6 +91,6 @@ func TestStringExample(t *testing.T) {
 //		func() (interface{}, error) {
 //			return 1, nil
 //		}))
-//	obj, _ := p.BorrowObject()
+//	obj, _ := p.BorrowObject(ctx)
 //	p.ReturnObject(obj)
 //}

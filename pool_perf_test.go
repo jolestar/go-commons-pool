@@ -20,7 +20,7 @@ func BenchmarkPoolBorrowReturn(b *testing.B) {
 	}))
 	defer pool.Close(ctx)
 	for i := 0; i < b.N; i++ {
-		o, err := pool.BorrowObject()
+		o, err := pool.BorrowObject(ctx)
 		if err != nil {
 			b.Fail()
 		}
@@ -40,7 +40,7 @@ func BenchmarkPoolBorrowReturnParallel(b *testing.B) {
 	defer pool.Close(ctx)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			o, err := pool.BorrowObject()
+			o, err := pool.BorrowObject(ctx)
 			//fmt.Println("borrow:",reflect.ValueOf(o).Pointer())
 			if err != nil {
 				fmt.Println(err)
@@ -119,7 +119,7 @@ func runOnce(ctx context.Context, pool *ObjectPool, taskStats *TaskStats) (int64
 		fmt.Println("   waiting: ", taskStats.waiting, "   complete: ", taskStats.complete)
 	}
 	bbegin := currentTimeMillis()
-	o, _ := pool.BorrowObject()
+	o, _ := pool.BorrowObject(ctx)
 	bend := currentTimeMillis()
 	taskStats.waiting--
 
