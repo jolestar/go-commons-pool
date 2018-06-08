@@ -52,6 +52,8 @@ func (o *AbandonedTestObject) hashCode() int {
 }
 
 func TestAbandonedTestObject(t *testing.T) {
+	t.Parallel()
+
 	obj := NewAbandonedTestObject()
 	var trackedUse TrackedUse
 	trackedUse = obj
@@ -72,7 +74,7 @@ func (f *SimpleAbandonedFactory) doWait(latencyMillisecond int64) {
 	time.Sleep(time.Duration(latencyMillisecond) * time.Millisecond)
 }
 
-func (f *SimpleAbandonedFactory) MakeObject() (*PooledObject, error) {
+func (f *SimpleAbandonedFactory) MakeObject(context.Context) (*PooledObject, error) {
 	if debugTest {
 		fmt.Println("factory MakeObject")
 	}
@@ -81,7 +83,7 @@ func (f *SimpleAbandonedFactory) MakeObject() (*PooledObject, error) {
 	return NewPooledObject(object), nil
 }
 
-func (f *SimpleAbandonedFactory) DestroyObject(object *PooledObject) error {
+func (f *SimpleAbandonedFactory) DestroyObject(ctx context.Context, object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory DestroyObject")
 	}
@@ -96,7 +98,7 @@ func (f *SimpleAbandonedFactory) DestroyObject(object *PooledObject) error {
 	return nil
 }
 
-func (f *SimpleAbandonedFactory) ValidateObject(object *PooledObject) bool {
+func (f *SimpleAbandonedFactory) ValidateObject(ctx context.Context, object *PooledObject) bool {
 	if debugTest {
 		fmt.Println("factory ValidateObject")
 	}
@@ -104,7 +106,7 @@ func (f *SimpleAbandonedFactory) ValidateObject(object *PooledObject) bool {
 	return true
 }
 
-func (f *SimpleAbandonedFactory) ActivateObject(object *PooledObject) error {
+func (f *SimpleAbandonedFactory) ActivateObject(ctx context.Context, object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory ActivateObject")
 		defer fmt.Println("factory ActivateObject end")
@@ -113,7 +115,7 @@ func (f *SimpleAbandonedFactory) ActivateObject(object *PooledObject) error {
 	return nil
 }
 
-func (f *SimpleAbandonedFactory) PassivateObject(object *PooledObject) error {
+func (f *SimpleAbandonedFactory) PassivateObject(ctx context.Context, object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory PassivateObject")
 	}
@@ -140,6 +142,8 @@ func (suit *PoolAbandonedTestSuite) ErrorWithResult(object interface{}, err erro
 }
 
 func TestPoolAbandonedTestSuite(t *testing.T) {
+	t.Parallel()
+
 	suite.Run(t, new(PoolAbandonedTestSuite))
 }
 
@@ -154,12 +158,13 @@ func (suit *PoolAbandonedTestSuite) SetupTest() {
 	factory := NewSimpleAbandonedFactory()
 	config := NewDefaultPoolConfig()
 	suit.factory = factory
-	suit.pool = NewObjectPoolWithAbandonedConfig(factory, config, abandonedConfig)
+	suit.pool = NewObjectPoolWithAbandonedConfig(context.Background(), factory, config, abandonedConfig)
 }
 
 func (suit *PoolAbandonedTestSuite) TearDownTest() {
-	suit.pool.Clear()
-	suit.pool.Close()
+	ctx := context.Background()
+	suit.pool.Clear(ctx)
+	suit.pool.Close(ctx)
 	suit.pool = nil
 	suit.factory = nil
 }
@@ -176,9 +181,10 @@ func concurrentBorrower(pool *ObjectPool, objects chan *AbandonedTestObject, wai
 
 func concurrentReturner(pool *ObjectPool, object *AbandonedTestObject, wait *sync.WaitGroup) {
 	go func() {
+		ctx := context.Background()
 		wait.Wait()
 		sleep(20)
-		pool.ReturnObject(object)
+		pool.ReturnObject(ctx, object)
 	}()
 }
 
@@ -220,11 +226,12 @@ func (suit *PoolAbandonedTestSuite) TestConcurrentInvalidation() {
 		vec = append(vec, <-objects)
 	}
 	close(objects)
+	ctx := context.Background()
 	// Return all objects that have not been destroyed
 	for i := 0; i < len(vec); i++ {
 		pto := vec[i]
 		if pto.active {
-			suit.NoError(suit.pool.ReturnObject(pto))
+			suit.NoError(suit.pool.ReturnObject(ctx, pto))
 		}
 	}
 
@@ -276,6 +283,7 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedReturn() {
  * invalidated is only destroyed (and pool counter decremented) once.
  */
 func (suit *PoolAbandonedTestSuite) TestAbandonedInvalidate() {
+	ctx := context.Background()
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = false
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = true
 	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
@@ -292,9 +300,9 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedInvalidate() {
 		obj = suit.NoErrorWithResult(suit.pool.BorrowObject()).(*AbandonedTestObject)
 	}
 
-	sleep(1000)                     // abandon checked out instances and let evictor start
-	suit.pool.InvalidateObject(obj) // Should not trigger another destroy / decrement
-	sleep(2000)                     // give evictor time to finish destroys
+	sleep(1000)                          // abandon checked out instances and let evictor start
+	suit.pool.InvalidateObject(ctx, obj) // Should not trigger another destroy / decrement
+	sleep(2000)                          // give evictor time to finish destroys
 	suit.Equal(0, suit.pool.GetNumActive())
 	suit.Equal(5, suit.pool.GetDestroyedCount())
 }
@@ -304,6 +312,8 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedInvalidate() {
  * is in process of being returned to the pool is not destroyed.
  */
 func (suit *PoolAbandonedTestSuite) TestRemoveAbandonedWhileReturning() {
+	ctx := context.Background()
+
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = false
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = true
 	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
@@ -321,8 +331,8 @@ func (suit *PoolAbandonedTestSuite) TestRemoveAbandonedWhileReturning() {
 	// then arrange for evictor to run while it is being returned
 	// validation takes a second, evictor runs every 500 ms
 	obj := suit.NoErrorWithResult(suit.pool.BorrowObject())
-	sleep(50)                   // abandon obj
-	suit.pool.ReturnObject(obj) // evictor will run during validation
+	sleep(50)                        // abandon obj
+	suit.pool.ReturnObject(ctx, obj) // evictor will run during validation
 	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject())
 	suit.Equal(obj, obj2)                             // should get original back
 	suit.True(!obj2.(*AbandonedTestObject).destroyed) // and not destroyed
@@ -337,6 +347,8 @@ func (suit *PoolAbandonedTestSuite) TestRemoveAbandonedWhileReturning() {
  *
  */
 func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
+	ctx := context.Background()
+
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = false
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = true
 	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
@@ -353,13 +365,15 @@ func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
 	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(ctx))
 	end := currentTimeMillis()
 
-	suit.pool.ReturnObject(o2)
+	suit.pool.ReturnObject(ctx, o2)
 
 	suit.True(end-start < 5000)
 }
 
 func (suit *PoolAbandonedTestSuite) TestAbandonedConfigReturnObjectError() {
+	ctx := context.Background()
+
 	obj := NewAbandonedTestObject()
-	err := suit.pool.ReturnObject(obj)
+	err := suit.pool.ReturnObject(ctx, obj)
 	suit.Nil(err)
 }

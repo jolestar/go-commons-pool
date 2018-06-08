@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"errors"
 	"math"
 	"sync"
@@ -191,6 +192,11 @@ type ObjectPoolConfig struct {
 	* if this value changed after ObjectPool created, should call ObjectPool.StartEvictor to take effect.
 	 */
 	TimeBetweenEvictionRunsMillis int64
+
+	/**
+	 * The context.Context to use when the evictor runs in the background.
+	 */
+	EvitionContext context.Context
 }
 
 // NewDefaultPoolConfig return a ObjectPoolConfig instance init with default value.
@@ -205,6 +211,7 @@ func NewDefaultPoolConfig() *ObjectPoolConfig {
 		SoftMinEvictableIdleTimeMillis: DefaultSoftMinEvictableIdleTimeMillis,
 		NumTestsPerEvictionRun:         DefaultNumTestsPerEvictionRun,
 		EvictionPolicyName:             DefaultEvictionPolicyName,
+		EvitionContext:                 context.Background(),
 		TestOnCreate:                   DefaultTestOnCreate,
 		TestOnBorrow:                   DefaultTestOnBorrow,
 		TestOnReturn:                   DefaultTestOnReturn,
@@ -231,6 +238,7 @@ type EvictionConfig struct {
 	IdleEvictTime     int64
 	IdleSoftEvictTime int64
 	MinIdle           int
+	Context           context.Context
 }
 
 // EvictionPolicy is a interface support custom EvictionPolicy
