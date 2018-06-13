@@ -31,14 +31,14 @@ func NewAbandonedTestObject() *AbandonedTestObject {
 	return &object
 }
 
-func (o *AbandonedTestObject) GetLastUsed() int64 {
+func (o *AbandonedTestObject) GetLastUsed() time.Time {
 	if o._abandoned {
 		// Abandoned object sweep will occur no matter what the value of removeAbandonedTimeout,
 		// because suit indicates that suit object was last used decades ago
-		return 1
+		return time.Time{}.Add(1)
 	}
 	// Abandoned object sweep won't clean up suit object
-	return 0
+	return time.Time{}
 }
 
 func (o *AbandonedTestObject) destroy() {
@@ -57,21 +57,17 @@ func TestAbandonedTestObject(t *testing.T) {
 	obj := NewAbandonedTestObject()
 	var trackedUse TrackedUse
 	trackedUse = obj
-	assert.Equal(t, int64(0), trackedUse.GetLastUsed())
+	assert.Zero(t, trackedUse.GetLastUsed())
 }
 
 type SimpleAbandonedFactory struct {
-	destroyLatency  int64
-	validateLatency int64
+	destroyLatency  time.Duration
+	validateLatency time.Duration
 	counter         concurrent.AtomicInteger
 }
 
 func NewSimpleAbandonedFactory() *SimpleAbandonedFactory {
 	return &SimpleAbandonedFactory{}
-}
-
-func (f *SimpleAbandonedFactory) doWait(latencyMillisecond int64) {
-	time.Sleep(time.Duration(latencyMillisecond) * time.Millisecond)
 }
 
 func (f *SimpleAbandonedFactory) MakeObject(context.Context) (*PooledObject, error) {
@@ -92,7 +88,7 @@ func (f *SimpleAbandonedFactory) DestroyObject(ctx context.Context, object *Pool
 	// helps simulate threading errors
 	//Thread.yield();
 	if f.destroyLatency != 0 {
-		f.doWait(f.destroyLatency)
+		time.Sleep(f.destroyLatency)
 	}
 	object.Object.(*AbandonedTestObject).destroy()
 	return nil
@@ -102,7 +98,7 @@ func (f *SimpleAbandonedFactory) ValidateObject(ctx context.Context, object *Poo
 	if debugTest {
 		fmt.Println("factory ValidateObject")
 	}
-	f.doWait(f.validateLatency)
+	time.Sleep(f.validateLatency)
 	return true
 }
 
@@ -154,7 +150,7 @@ func (suit *PoolAbandonedTestSuite) SetupTest() {
 	// abandonedConfig.setLogAbandoned(true);
 
 	abandonedConfig.RemoveAbandonedOnBorrow = true
-	abandonedConfig.RemoveAbandonedTimeout = 1
+	abandonedConfig.RemoveAbandonedTimeout = 1 * time.Second
 	factory := NewSimpleAbandonedFactory()
 	config := NewDefaultPoolConfig()
 	suit.factory = factory
@@ -249,8 +245,8 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedReturn() {
 	ctx := context.Background()
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = true
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = false
-	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
-	suit.factory.destroyLatency = 200
+	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1 * time.Second
+	suit.factory.destroyLatency = 200 * time.Millisecond
 
 	n := 10
 	suit.pool.Config.MaxTotal = n
@@ -288,13 +284,13 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedInvalidate() {
 	ctx := context.Background()
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = false
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = true
-	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
+	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1 * time.Second
 	// destroys take 200 ms
-	suit.factory.destroyLatency = 200
+	suit.factory.destroyLatency = 200 * time.Millisecond
 	n := 10
 	suit.pool.Config.MaxTotal = n
 	suit.pool.Config.BlockWhenExhausted = false
-	suit.pool.Config.TimeBetweenEvictionRunsMillis = 500
+	suit.pool.Config.TimeBetweenEvictionRuns = 500 * time.Millisecond
 	suit.pool.StartEvictor()
 
 	var obj *AbandonedTestObject
@@ -318,14 +314,14 @@ func (suit *PoolAbandonedTestSuite) TestRemoveAbandonedWhileReturning() {
 
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = false
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = true
-	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
+	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1 * time.Second
 
-	suit.factory.validateLatency = 1000
+	suit.factory.validateLatency = 1 * time.Second
 	n := 10
 
 	suit.pool.Config.MaxTotal = n
 	suit.pool.Config.BlockWhenExhausted = false
-	suit.pool.Config.TimeBetweenEvictionRunsMillis = 500
+	suit.pool.Config.TimeBetweenEvictionRuns = 500 * time.Millisecond
 	suit.pool.Config.TestOnReturn = true
 	suit.pool.StartEvictor()
 
@@ -353,9 +349,9 @@ func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
 
 	suit.pool.AbandonedConfig.RemoveAbandonedOnBorrow = false
 	suit.pool.AbandonedConfig.RemoveAbandonedOnMaintenance = true
-	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1
+	suit.pool.AbandonedConfig.RemoveAbandonedTimeout = 1 * time.Second
 	suit.pool.Config.MaxTotal = 1
-	suit.pool.Config.TimeBetweenEvictionRunsMillis = 500
+	suit.pool.Config.TimeBetweenEvictionRuns = 500 * time.Millisecond
 	suit.pool.StartEvictor()
 
 	suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
@@ -363,13 +359,13 @@ func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	start := currentTimeMillis()
+	start := time.Now()
 	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(ctx))
-	end := currentTimeMillis()
+	elapsed := time.Since(start)
 
 	suit.pool.ReturnObject(ctx, o2)
 
-	suit.True(end-start < 5000)
+	suit.True(elapsed < 5*time.Second)
 }
 
 func (suit *PoolAbandonedTestSuite) TestAbandonedConfigReturnObjectError() {

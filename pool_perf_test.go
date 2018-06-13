@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/jolestar/go-commons-pool/concurrent"
 )
@@ -108,19 +109,19 @@ func (f *SleepingObjectFactory) PassivateObject(ctx context.Context, object *Poo
 type TaskStats struct {
 	waiting         int
 	complete        int
-	totalBorrowTime int64
-	totalReturnTime int64
+	totalBorrowTime time.Duration
+	totalReturnTime time.Duration
 	nrSamples       int
 }
 
-func runOnce(ctx context.Context, pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
+func runOnce(ctx context.Context, pool *ObjectPool, taskStats *TaskStats) (time.Duration, time.Duration) {
 	taskStats.waiting++
 	if debugTest {
 		fmt.Println("   waiting: ", taskStats.waiting, "   complete: ", taskStats.complete)
 	}
-	bbegin := currentTimeMillis()
+	begin := time.Now()
 	o, _ := pool.BorrowObject(ctx)
-	bend := currentTimeMillis()
+	borrowTime := time.Since(begin)
 	taskStats.waiting--
 
 	if debugTest {
@@ -129,12 +130,11 @@ func runOnce(ctx context.Context, pool *ObjectPool, taskStats *TaskStats) (int64
 			"   complete: ", taskStats.complete)
 	}
 
-	rbegin := currentTimeMillis()
+	begin = time.Now()
 	pool.ReturnObject(ctx, o)
-	rend := currentTimeMillis()
+	returnTime := time.Since(begin)
 	taskStats.complete++
-	borrowTime := bend - bbegin
-	returnTime := rend - rbegin
+
 	return borrowTime, returnTime
 }
 
@@ -192,9 +192,9 @@ func perfRun(ctx context.Context, iterations int, nrThreads int, maxTotal int, m
 	fmt.Println("totalBorrowTime: ", aggregate.totalBorrowTime)
 	fmt.Println("totalReturnTime: ", aggregate.totalReturnTime)
 	fmt.Println("avg BorrowTime: ",
-		aggregate.totalBorrowTime/int64(aggregate.nrSamples))
+		aggregate.totalBorrowTime/time.Duration(aggregate.nrSamples))
 	fmt.Println("avg ReturnTime: ",
-		aggregate.totalReturnTime/int64(aggregate.nrSamples))
+		aggregate.totalReturnTime/time.Duration(aggregate.nrSamples))
 }
 
 func perfMain(ctx context.Context) {

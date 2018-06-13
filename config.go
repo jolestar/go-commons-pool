@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"sync"
+	"time"
 )
 
 const (
@@ -20,10 +21,10 @@ const (
 	// TODO
 	// DEFAULT_FAIRNESS = false
 
-	// DefaultMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.MinEvictableIdleTimeMillis
-	DefaultMinEvictableIdleTimeMillis = int64(1000 * 60 * 30)
-	// DefaultSoftMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.SoftMinEvictableIdleTimeMillis
-	DefaultSoftMinEvictableIdleTimeMillis = int64(math.MaxInt64)
+	// DefaultMinEvictableIdleTime is the default value of ObjectPoolConfig.MinEvictableIdleTime
+	DefaultMinEvictableIdleTime = 30 * time.Minute
+	// DefaultSoftMinEvictableIdleTime is the default value of ObjectPoolConfig.SoftMinEvictableIdleTime
+	DefaultSoftMinEvictableIdleTime = time.Duration(math.MaxInt64)
 	// DefaultNumTestsPerEvictionRun is the default value of ObjectPoolConfig.NumTestsPerEvictionRun
 	DefaultNumTestsPerEvictionRun = 3
 	// DefaultTestOnCreate is the default value of ObjectPoolConfig.TestOnCreate
@@ -34,8 +35,8 @@ const (
 	DefaultTestOnReturn = false
 	// DefaultTestWhileIdle is the default value of ObjectPoolConfig.TestWhileIdle
 	DefaultTestWhileIdle = false
-	// DefaultTimeBetweenEvictionRunsMillis is the default value of ObjectPoolConfig.TimeBetweenEvictionRunsMillis
-	DefaultTimeBetweenEvictionRunsMillis = int64(-1)
+	// DefaultTimeBetweenEvictionRuns is the default value of ObjectPoolConfig.TimeBetweenEvictionRuns
+	DefaultTimeBetweenEvictionRuns = time.Duration(0)
 	// DefaultBlockWhenExhausted is the default value of ObjectPoolConfig.BlockWhenExhausted
 	DefaultBlockWhenExhausted = true
 	// DefaultEvictionPolicyName is the default value of ObjectPoolConfig.EvictionPolicyName
@@ -74,8 +75,8 @@ type ObjectPoolConfig struct {
 
 	/**
 	 * The minimum number of idle objects to maintain in
-	 * the pool. This setting only has an effect if it is positive and
-	 * TimeBetweenEvictionRunsMillis is greater than zero. If this
+	 * the pool. This setting only has an effect if
+	 * TimeBetweenEvictionRuns is greater than zero. If this
 	 * is the case, an attempt is made to ensure that the pool has the required
 	 * minimum number of instances during idle object eviction runs.
 	 *
@@ -116,12 +117,12 @@ type ObjectPoolConfig struct {
 	/**
 	* Whether objects sitting idle in the pool will be validated by the
 	* idle object evictor (if any - see
-	*  TimeBetweenEvictionRunsMillis ). Validation is performed
+	*  TimeBetweenEvictionRuns ). Validation is performed
 	* by the ValidateObject() method of the factory associated
 	* with the pool. If the object fails to validate, it will be removed from
 	* the pool and destroyed.  Note that setting this property has no effect
 	* unless the idle object evictor is enabled by setting
-	* TimeBetweenEvictionRunsMillis  to a positive value.
+	* TimeBetweenEvictionRuns to a positive value.
 	 */
 	TestWhileIdle bool
 
@@ -138,22 +139,22 @@ type ObjectPoolConfig struct {
 	/**
 	 * The minimum amount of time an object may sit idle in the pool
 	 * before it is eligible for eviction by the idle object evictor (if any -
-	 * see TimeBetweenEvictionRunsMillis . When non-positive,
+	 * see TimeBetweenEvictionRuns. When non-positive,
 	 * no objects will be evicted from the pool due to idle time alone.
 	 */
-	MinEvictableIdleTimeMillis int64
+	MinEvictableIdleTime time.Duration
 
 	/**
 	 * The minimum amount of time an object may sit idle in the pool
 	 * before it is eligible for eviction by the idle object evictor (if any -
-	 * see TimeBetweenEvictionRunsMillis ),
+	 * see TimeBetweenEvictionRuns),
 	 * with the extra condition that at least MinIdle object
 	 * instances remain in the pool. This setting is overridden by
-	 *  MinEvictableIdleTimeMillis (that is, if
-	 *  MinEvictableIdleTimeMillis is positive, then
-	 *  SoftMinEvictableIdleTimeMillis is ignored).
+	 *  MinEvictableIdleTime (that is, if
+	 *  MinEvictableIdleTime is positive, then
+	 *  SoftMinEvictableIdleTime is ignored).
 	 */
-	SoftMinEvictableIdleTimeMillis int64
+	SoftMinEvictableIdleTime time.Duration
 
 	/**
 	 * The maximum number of objects to examine during each run (if any)
@@ -179,7 +180,7 @@ type ObjectPoolConfig struct {
 	* will be run.
 	* if this value changed after ObjectPool created, should call ObjectPool.StartEvictor to take effect.
 	 */
-	TimeBetweenEvictionRunsMillis int64
+	TimeBetweenEvictionRuns time.Duration
 
 	/**
 	 * The context.Context to use when the evictor runs in the background.
@@ -190,40 +191,40 @@ type ObjectPoolConfig struct {
 // NewDefaultPoolConfig return a ObjectPoolConfig instance init with default value.
 func NewDefaultPoolConfig() *ObjectPoolConfig {
 	return &ObjectPoolConfig{
-		Lifo:                           DefaultLifo,
-		MaxTotal:                       DefaultMaxTotal,
-		MaxIdle:                        DefaultMaxIdle,
-		MinIdle:                        DefaultMinIdle,
-		MinEvictableIdleTimeMillis:     DefaultMinEvictableIdleTimeMillis,
-		SoftMinEvictableIdleTimeMillis: DefaultSoftMinEvictableIdleTimeMillis,
-		NumTestsPerEvictionRun:         DefaultNumTestsPerEvictionRun,
-		EvictionPolicyName:             DefaultEvictionPolicyName,
-		EvitionContext:                 context.Background(),
-		TestOnCreate:                   DefaultTestOnCreate,
-		TestOnBorrow:                   DefaultTestOnBorrow,
-		TestOnReturn:                   DefaultTestOnReturn,
-		TestWhileIdle:                  DefaultTestWhileIdle,
-		TimeBetweenEvictionRunsMillis:  DefaultTimeBetweenEvictionRunsMillis,
-		BlockWhenExhausted:             DefaultBlockWhenExhausted}
+		Lifo:                     DefaultLifo,
+		MaxTotal:                 DefaultMaxTotal,
+		MaxIdle:                  DefaultMaxIdle,
+		MinIdle:                  DefaultMinIdle,
+		MinEvictableIdleTime:     DefaultMinEvictableIdleTime,
+		SoftMinEvictableIdleTime: DefaultSoftMinEvictableIdleTime,
+		NumTestsPerEvictionRun:   DefaultNumTestsPerEvictionRun,
+		EvictionPolicyName:       DefaultEvictionPolicyName,
+		EvitionContext:           context.Background(),
+		TestOnCreate:             DefaultTestOnCreate,
+		TestOnBorrow:             DefaultTestOnBorrow,
+		TestOnReturn:             DefaultTestOnReturn,
+		TestWhileIdle:            DefaultTestWhileIdle,
+		TimeBetweenEvictionRuns:  DefaultTimeBetweenEvictionRuns,
+		BlockWhenExhausted:       DefaultBlockWhenExhausted}
 }
 
 // AbandonedConfig ObjectPool abandoned strategy config
 type AbandonedConfig struct {
 	RemoveAbandonedOnBorrow      bool
 	RemoveAbandonedOnMaintenance bool
-	// Timeout in seconds before an abandoned object can be removed.
-	RemoveAbandonedTimeout int
+	// Timeout before an abandoned object can be removed.
+	RemoveAbandonedTimeout time.Duration
 }
 
 // NewDefaultAbandonedConfig return a new AbandonedConfig instance init with default.
 func NewDefaultAbandonedConfig() *AbandonedConfig {
-	return &AbandonedConfig{RemoveAbandonedOnBorrow: false, RemoveAbandonedOnMaintenance: false, RemoveAbandonedTimeout: 300}
+	return &AbandonedConfig{RemoveAbandonedOnBorrow: false, RemoveAbandonedOnMaintenance: false, RemoveAbandonedTimeout: 5 * time.Minute}
 }
 
 // EvictionConfig is config for ObjectPool EvictionPolicy
 type EvictionConfig struct {
-	IdleEvictTime     int64
-	IdleSoftEvictTime int64
+	IdleEvictTime     time.Duration
+	IdleSoftEvictTime time.Duration
 	MinIdle           int
 	Context           context.Context
 }
@@ -240,7 +241,7 @@ type DefaultEvictionPolicy struct {
 
 // Evict do evict by config
 func (p *DefaultEvictionPolicy) Evict(config *EvictionConfig, underTest *PooledObject, idleCount int) bool {
-	idleTime := underTest.GetIdleTimeMillis()
+	idleTime := underTest.GetIdleTime()
 
 	if (config.IdleSoftEvictTime < idleTime &&
 		config.MinIdle < idleCount) ||

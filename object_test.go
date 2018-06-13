@@ -1,8 +1,10 @@
 package pool
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPooledObject(t *testing.T) {
@@ -16,35 +18,35 @@ func TestPooledObject(t *testing.T) {
 }
 
 type TrackedUseObject struct {
-	lastUsed int64
+	lastUsed time.Time
 }
 
-func (o *TrackedUseObject) GetLastUsed() int64 {
+func (o *TrackedUseObject) GetLastUsed() time.Time {
 	return o.lastUsed
 }
 
 func TestTrackedUse(t *testing.T) {
-	time := currentTimeMillis()
-	object := &TrackedUseObject{lastUsed: time}
+	now := time.Now()
+	object := &TrackedUseObject{lastUsed: now}
 	var trackedUse TrackedUse
 	trackedUse = object
-	assert.Equal(t, time, trackedUse.GetLastUsed())
+	assert.Equal(t, now, trackedUse.GetLastUsed())
 
 	pooledObject := NewPooledObject(object)
 	sleep(20)
 	pooledObject.Allocate()
 	time2 := pooledObject.GetLastUsedTime()
-	assert.True(t, time != time2)
-	object.lastUsed = currentTimeMillis()
+	assert.True(t, now != time2)
+	object.lastUsed = time.Now()
 	time3 := pooledObject.GetLastUsedTime()
 	assert.Equal(t, object.lastUsed, time3)
 }
 
-func TestActiveTimeMillis(t *testing.T) {
+func TestActiveTime(t *testing.T) {
 	object := &TrackedUseObject{}
 	pooledObject := NewPooledObject(object)
 	pooledObject.Allocate()
 	sleep(20)
 	pooledObject.Deallocate()
-	assert.True(t, pooledObject.GetActiveTimeMillis() >= 20)
+	assert.True(t, pooledObject.GetActiveTime() >= 20*time.Millisecond)
 }
