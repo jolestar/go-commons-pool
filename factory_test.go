@@ -1,9 +1,11 @@
 package pool
 
 import (
+	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type TestFactoryObject struct {
@@ -11,56 +13,63 @@ type TestFactoryObject struct {
 }
 
 func TestDefaultPooledObjectFactorySimple(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
 	factory := NewPooledObjectFactorySimple(
-		func() (interface{}, error) {
+		func(context.Context) (interface{}, error) {
 			return &TestFactoryObject{status: "make"}, nil
 		})
 
 	assert.NotNil(t, factory)
-	o, _ := factory.MakeObject()
+	o, _ := factory.MakeObject(ctx)
 	if debugTest {
 		fmt.Println("object:", o.Object)
 	}
 	assert.NotNil(t, o)
-	assert.Nil(t, factory.ActivateObject(o))
-	assert.Nil(t, factory.PassivateObject(o))
-	assert.True(t, factory.ValidateObject(o))
-	assert.Nil(t, factory.DestroyObject(o))
+	assert.Nil(t, factory.ActivateObject(ctx, o))
+	assert.Nil(t, factory.PassivateObject(ctx, o))
+	assert.True(t, factory.ValidateObject(ctx, o))
+	assert.Nil(t, factory.DestroyObject(ctx, o))
 }
 
 func TestDefaultPooledObjectFactory(t *testing.T) {
+	t.Parallel()
+
 	factory := NewPooledObjectFactory(
-		func() (interface{}, error) {
+		func(context.Context) (interface{}, error) {
 			return &TestFactoryObject{status: "make"}, nil
 		},
-		func(object *PooledObject) error {
+		func(ctx context.Context, object *PooledObject) error {
 			object.Object.(*TestFactoryObject).status = "destory"
 			return nil
 		},
-		func(object *PooledObject) bool {
+		func(ctx context.Context, object *PooledObject) bool {
 			object.Object.(*TestFactoryObject).status = "validate"
 			return true
 		},
-		func(object *PooledObject) error {
+		func(ctx context.Context, object *PooledObject) error {
 			object.Object.(*TestFactoryObject).status = "activate"
 			return nil
 		},
-		func(object *PooledObject) error {
+		func(ctx context.Context, object *PooledObject) error {
 			object.Object.(*TestFactoryObject).status = "passivate"
 			return nil
 		})
 
 	assert.NotNil(t, factory)
-	o, _ := factory.MakeObject()
+
+	ctx := context.Background()
+	o, _ := factory.MakeObject(ctx)
 	assert.NotNil(t, o)
 	obj := o.Object.(*TestFactoryObject)
 	assert.Equal(t, "make", obj.status)
-	assert.Nil(t, factory.ActivateObject(o))
+	assert.Nil(t, factory.ActivateObject(ctx, o))
 	assert.Equal(t, "activate", obj.status)
-	assert.Nil(t, factory.PassivateObject(o))
+	assert.Nil(t, factory.PassivateObject(ctx, o))
 	assert.Equal(t, "passivate", obj.status)
-	assert.True(t, factory.ValidateObject(o))
+	assert.True(t, factory.ValidateObject(ctx, o))
 	assert.Equal(t, "validate", obj.status)
-	assert.Nil(t, factory.DestroyObject(o))
+	assert.Nil(t, factory.DestroyObject(ctx, o))
 	assert.Equal(t, "destory", obj.status)
 }

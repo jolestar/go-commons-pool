@@ -2,8 +2,9 @@ package pool
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPoolConfig(t *testing.T) {
@@ -26,7 +27,6 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, DefaultLifo, config.Lifo)
 	assert.Equal(t, DefaultMaxIdle, config.MaxIdle)
 	assert.Equal(t, DefaultMaxTotal, config.MaxTotal)
-	assert.Equal(t, DefaultMaxWaitMillis, config.MaxWaitMillis)
 	assert.Equal(t, DefaultMinEvictableIdleTimeMillis, config.MinEvictableIdleTimeMillis)
 	assert.Equal(t, DefaultMinIdle, config.MinIdle)
 	assert.Equal(t, DefaultNumTestsPerEvictionRun, config.NumTestsPerEvictionRun)

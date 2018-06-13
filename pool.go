@@ -1,12 +1,14 @@
 package pool
 
 import (
+	"context"
 	"errors"
-	"github.com/jolestar/go-commons-pool/collections"
-	"github.com/jolestar/go-commons-pool/concurrent"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/collections"
+	"github.com/jolestar/go-commons-pool/concurrent"
 )
 
 type baseErr struct {
@@ -58,17 +60,17 @@ type ObjectPool struct {
 }
 
 // NewObjectPool return new ObjectPool, init with PooledObjectFactory and ObjectPoolConfig
-func NewObjectPool(factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
-	return NewObjectPoolWithAbandonedConfig(factory, config, nil)
+func NewObjectPool(ctx context.Context, factory PooledObjectFactory, config *ObjectPoolConfig) *ObjectPool {
+	return NewObjectPoolWithAbandonedConfig(ctx, factory, config, nil)
 }
 
 // NewObjectPoolWithDefaultConfig return new ObjectPool init with PooledObjectFactory and default config
-func NewObjectPoolWithDefaultConfig(factory PooledObjectFactory) *ObjectPool {
-	return NewObjectPool(factory, NewDefaultPoolConfig())
+func NewObjectPoolWithDefaultConfig(ctx context.Context, factory PooledObjectFactory) *ObjectPool {
+	return NewObjectPool(ctx, factory, NewDefaultPoolConfig())
 }
 
 // NewObjectPoolWithAbandonedConfig return new ObjectPool init with PooledObjectFactory, ObjectPoolConfig, and AbandonedConfig
-func NewObjectPoolWithAbandonedConfig(factory PooledObjectFactory, config *ObjectPoolConfig, abandonedConfig *AbandonedConfig) *ObjectPool {
+func NewObjectPoolWithAbandonedConfig(ctx context.Context, factory PooledObjectFactory, config *ObjectPoolConfig, abandonedConfig *AbandonedConfig) *ObjectPool {
 	pool := ObjectPool{factory: factory, Config: config,
 		idleObjects:             collections.NewDeque(math.MaxInt32),
 		allObjects:              collections.NewSyncMap(),
@@ -83,30 +85,44 @@ func NewObjectPoolWithAbandonedConfig(factory PooledObjectFactory, config *Objec
 // AddObject create an object using the PooledObjectFactory factory, passivate it, and then place it in
 // the idle object pool. AddObject is useful for "pre-loading"
 // a pool with idle objects. (Optional operation).
-func (pool *ObjectPool) AddObject() error {
+func (pool *ObjectPool) AddObject(ctx context.Context) error {
 	if pool.IsClosed() {
 		return NewIllegalStateErr("Pool not open")
 	}
 	if pool.factory == nil {
 		return NewIllegalStateErr("Cannot add objects without a factory.")
 	}
-	p, e := pool.create()
+	p, e := pool.create(ctx)
 	if e != nil {
 		return e
 	}
-	pool.addIdleObject(p)
+	e = pool.addIdleObject(ctx, p)
+	if e != nil {
+		pool.destroy(ctx, p)
+		return e
+	}
 	return nil
 }
 
-func (pool *ObjectPool) addIdleObject(p *PooledObject) {
+func (pool *ObjectPool) addIdleObject(ctx context.Context, p *PooledObject) error {
 	if p != nil {
-		pool.factory.PassivateObject(p)
+		err := pool.factory.PassivateObject(ctx, p)
+		if err != nil {
+			return err
+		}
+
 		if pool.Config.Lifo {
-			pool.idleObjects.AddFirst(p)
+			err = pool.idleObjects.AddFirst(p)
 		} else {
-			pool.idleObjects.AddLast(p)
+			err = pool.idleObjects.AddLast(p)
+		}
+
+		if err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 // BorrowObject obtains an instance from pool.
@@ -118,8 +134,8 @@ func (pool *ObjectPool) addIdleObject(p *PooledObject) {
 //
 // By contract, clients must return the borrowed instance
 // using ReturnObject, InvalidateObject
-func (pool *ObjectPool) BorrowObject() (interface{}, error) {
-	return pool.borrowObject(pool.Config.MaxWaitMillis)
+func (pool *ObjectPool) BorrowObject(ctx context.Context) (interface{}, error) {
+	return pool.borrowObject(ctx)
 }
 
 // GetNumIdle return the number of instances currently idle in pool. This may be
@@ -144,7 +160,7 @@ func (pool *ObjectPool) GetDestroyedByBorrowValidationCount() int {
 	return int(pool.destroyedByBorrowValidationCount.Get())
 }
 
-func (pool *ObjectPool) removeAbandoned(config *AbandonedConfig) {
+func (pool *ObjectPool) removeAbandoned(ctx context.Context, config *AbandonedConfig) {
 	// Generate a list of abandoned objects to remove
 	now := currentTimeMillis()
 	timeout := now - int64((config.RemoveAbandonedTimeout * 1000))
@@ -166,11 +182,11 @@ func (pool *ObjectPool) removeAbandoned(config *AbandonedConfig) {
 		//if (config.getLogAbandoned()) {
 		//pooledObject.printStackTrace(ac.getLogWriter());
 		//}
-		pool.InvalidateObject(pooledObject.Object)
+		pool.InvalidateObject(ctx, pooledObject.Object)
 	}
 }
 
-func (pool *ObjectPool) create() (*PooledObject, error) {
+func (pool *ObjectPool) create(ctx context.Context) (*PooledObject, error) {
 	localMaxTotal := pool.Config.MaxTotal
 	newCreateCount := pool.createCount.IncrementAndGet()
 	if localMaxTotal > -1 && int(newCreateCount) > localMaxTotal ||
@@ -179,7 +195,7 @@ func (pool *ObjectPool) create() (*PooledObject, error) {
 		return nil, nil
 	}
 
-	p, e := pool.factory.MakeObject()
+	p, e := pool.factory.MakeObject(ctx)
 	if e != nil {
 		pool.createCount.DecrementAndGet()
 		return nil, e
@@ -193,11 +209,11 @@ func (pool *ObjectPool) create() (*PooledObject, error) {
 	return p, nil
 }
 
-func (pool *ObjectPool) destroy(toDestroy *PooledObject) {
-	pool.doDestroy(toDestroy, false)
+func (pool *ObjectPool) destroy(ctx context.Context, toDestroy *PooledObject) {
+	pool.doDestroy(ctx, toDestroy, false)
 }
 
-func (pool *ObjectPool) doDestroy(toDestroy *PooledObject, inLock bool) {
+func (pool *ObjectPool) doDestroy(ctx context.Context, toDestroy *PooledObject, inLock bool) {
 	//golang has not recursive lock, so ...
 	if inLock {
 		toDestroy.invalidate()
@@ -206,7 +222,7 @@ func (pool *ObjectPool) doDestroy(toDestroy *PooledObject, inLock bool) {
 	}
 	pool.idleObjects.RemoveFirstOccurrence(toDestroy)
 	pool.allObjects.Remove(toDestroy.Object)
-	pool.factory.DestroyObject(toDestroy)
+	pool.factory.DestroyObject(ctx, toDestroy)
 	pool.destroyedCount.IncrementAndGet()
 	pool.createCount.DecrementAndGet()
 }
@@ -221,7 +237,7 @@ func (pool *ObjectPool) updateStatsReturn(activeTime int64) {
 	//activeTimes.add(activeTime);
 }
 
-func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, error) {
+func (pool *ObjectPool) borrowObject(ctx context.Context) (interface{}, error) {
 	if pool.IsClosed() {
 		return nil, NewIllegalStateErr("Pool not open")
 	}
@@ -229,7 +245,7 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 	if ac != nil && ac.RemoveAbandonedOnBorrow &&
 		(pool.GetNumIdle() < 2) &&
 		(pool.GetNumActive() > pool.Config.MaxTotal-3) {
-		pool.removeAbandoned(ac)
+		pool.removeAbandoned(ctx, ac)
 	}
 
 	var p *PooledObject
@@ -246,7 +262,7 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		if blockWhenExhausted {
 			p, ok = pool.idleObjects.PollFirst().(*PooledObject)
 			if !ok {
-				p, e = pool.create()
+				p, e = pool.create(ctx)
 				if e != nil {
 					return nil, e
 				}
@@ -256,20 +272,11 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 				}
 			}
 			if p == nil {
-				if borrowMaxWaitMillis < 0 {
-					obj, err := pool.idleObjects.TakeFirst()
-					if err != nil {
-						return nil, err
-					}
-					p, ok = obj.(*PooledObject)
-				} else {
-					obj, err := pool.idleObjects.PollFirstWithTimeout(time.Duration(borrowMaxWaitMillis) * time.Millisecond)
-					if err != nil {
-						return nil, err
-					}
-					p, ok = obj.(*PooledObject)
+				obj, err := pool.idleObjects.PollFirstWithContext(ctx)
+				if err != nil {
+					return nil, err
 				}
-
+				p, ok = obj.(*PooledObject)
 			}
 			if !ok {
 				return nil, NewNoSuchElementErr("Timeout waiting for idle object")
@@ -280,7 +287,7 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		} else {
 			p, ok = pool.idleObjects.PollFirst().(*PooledObject)
 			if !ok {
-				p, e = pool.create()
+				p, e = pool.create(ctx)
 				if e != nil {
 					return nil, e
 				}
@@ -297,9 +304,9 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 		}
 
 		if p != nil {
-			e := pool.factory.ActivateObject(p)
+			e := pool.factory.ActivateObject(ctx, p)
 			if e != nil {
-				pool.destroy(p)
+				pool.destroy(ctx, p)
 				p = nil
 				if create {
 					return nil, NewNoSuchElementErr("Unable to activate object")
@@ -307,9 +314,9 @@ func (pool *ObjectPool) borrowObject(borrowMaxWaitMillis int64) (interface{}, er
 			}
 		}
 		if p != nil && (pool.Config.TestOnBorrow || create && pool.Config.TestOnCreate) {
-			validate := pool.factory.ValidateObject(p)
+			validate := pool.factory.ValidateObject(ctx, p)
 			if !validate {
-				pool.destroy(p)
+				pool.destroy(ctx, p)
 				pool.destroyedByBorrowValidationCount.IncrementAndGet()
 				p = nil
 				if create {
@@ -327,14 +334,14 @@ func (pool *ObjectPool) isAbandonedConfig() bool {
 	return pool.AbandonedConfig != nil
 }
 
-func (pool *ObjectPool) ensureIdle(idleCount int, always bool) {
+func (pool *ObjectPool) ensureIdle(ctx context.Context, idleCount int, always bool) {
 	if idleCount < 1 || pool.IsClosed() || (!always && !pool.idleObjects.HasTakeWaiters()) {
 		return
 	}
 
 	for pool.idleObjects.Size() < idleCount {
 		//just ignore create error
-		p, _ := pool.create()
+		p, _ := pool.create(ctx)
 		if p == nil {
 			// Can't create objects, no reason to think another call to
 			// create will work. Give up.
@@ -350,7 +357,7 @@ func (pool *ObjectPool) ensureIdle(idleCount int, always bool) {
 		// Pool closed while object was being added to idle objects.
 		// Make sure the returned object is destroyed rather than left
 		// in the idle object pool (which would effectively be a leak)
-		pool.Clear()
+		pool.Clear(ctx)
 	}
 }
 
@@ -364,7 +371,7 @@ func (pool *ObjectPool) IsClosed() bool {
 
 // ReturnObject return an instance to the pool. By contract, object
 // must have been obtained using BorrowObject()
-func (pool *ObjectPool) ReturnObject(object interface{}) error {
+func (pool *ObjectPool) ReturnObject(ctx context.Context, object interface{}) error {
 	if object == nil {
 		return errors.New("object is nil")
 	}
@@ -392,20 +399,20 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 	activeTime := p.GetActiveTimeMillis()
 
 	if pool.Config.TestOnReturn {
-		if !pool.factory.ValidateObject(p) {
-			pool.destroy(p)
-			pool.ensureIdle(1, false)
+		if !pool.factory.ValidateObject(ctx, p) {
+			pool.destroy(ctx, p)
+			pool.ensureIdle(ctx, 1, false)
 			pool.updateStatsReturn(activeTime)
 			// swallowException(e);
 			return nil
 		}
 	}
 
-	err := pool.factory.PassivateObject(p)
+	err := pool.factory.PassivateObject(ctx, p)
 	if err != nil {
 		//swallowException(e1);
-		pool.destroy(p)
-		pool.ensureIdle(1, false)
+		pool.destroy(ctx, p)
+		pool.ensureIdle(ctx, 1, false)
 		pool.updateStatsReturn(activeTime)
 		// swallowException(e);
 		return nil
@@ -417,7 +424,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 
 	maxIdleSave := pool.Config.MaxIdle
 	if pool.IsClosed() || maxIdleSave > -1 && maxIdleSave <= pool.idleObjects.Size() {
-		pool.destroy(p)
+		pool.destroy(ctx, p)
 	} else {
 		if pool.Config.Lifo {
 			pool.idleObjects.AddFirst(p)
@@ -428,7 +435,7 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 			// Pool closed while object was being added to idle objects.
 			// Make sure the returned object is destroyed rather than left
 			// in the idle object pool (which would effectively be a leak)
-			pool.Clear()
+			pool.Clear(ctx)
 		}
 	}
 	pool.updateStatsReturn(activeTime)
@@ -438,11 +445,11 @@ func (pool *ObjectPool) ReturnObject(object interface{}) error {
 // Clear clears any objects sitting idle in the pool, releasing any associated
 // resources (optional operation). Idle objects cleared must be
 // PooledObjectFactory.DestroyObject(PooledObject) .
-func (pool *ObjectPool) Clear() {
+func (pool *ObjectPool) Clear(ctx context.Context) {
 	p, ok := pool.idleObjects.PollFirst().(*PooledObject)
 
 	for ok {
-		pool.destroy(p)
+		pool.destroy(ctx, p)
 		p, ok = pool.idleObjects.PollFirst().(*PooledObject)
 	}
 }
@@ -452,7 +459,7 @@ func (pool *ObjectPool) Clear() {
 // using BorrowObject.
 // This method should be used when an object that has been borrowed is
 // determined (due to an exception or other problem) to be invalid.
-func (pool *ObjectPool) InvalidateObject(object interface{}) error {
+func (pool *ObjectPool) InvalidateObject(ctx context.Context, object interface{}) error {
 	p, ok := pool.allObjects.Get(object).(*PooledObject)
 	if !ok {
 		if pool.isAbandonedConfig() {
@@ -463,15 +470,15 @@ func (pool *ObjectPool) InvalidateObject(object interface{}) error {
 	}
 	p.lock.Lock()
 	if p.state != StateInvalid {
-		pool.doDestroy(p, true)
+		pool.doDestroy(ctx, p, true)
 	}
 	p.lock.Unlock()
-	pool.ensureIdle(1, false)
+	pool.ensureIdle(ctx, 1, false)
 	return nil
 }
 
 // Close pool, and free any resources associated with it.
-func (pool *ObjectPool) Close() {
+func (pool *ObjectPool) Close(ctx context.Context) {
 	if pool.IsClosed() {
 		return
 	}
@@ -487,7 +494,7 @@ func (pool *ObjectPool) Close() {
 
 	pool.closed = true
 	// This clear removes any idle objects
-	pool.Clear()
+	pool.Clear(ctx)
 
 	// Release any goroutines that were waiting for an object
 	pool.idleObjects.InterruptTakeWaiters()
@@ -519,8 +526,8 @@ func (pool *ObjectPool) startEvictor(delay int64) {
 			for {
 				select {
 				case <-pool.evictor.C:
-					pool.evict()
-					pool.ensureMinIdle()
+					pool.evict(pool.Config.EvitionContext)
+					pool.ensureMinIdle(pool.Config.EvitionContext)
 				case <-pool.evictorStopChan:
 					pool.evictorStopWG.Done()
 					return
@@ -565,11 +572,11 @@ func (pool *ObjectPool) getMinIdle() int {
 	return pool.Config.MinIdle
 }
 
-func (pool *ObjectPool) evict() {
+func (pool *ObjectPool) evict(ctx context.Context) {
 	defer func() {
 		ac := pool.AbandonedConfig
 		if ac != nil && ac.RemoveAbandonedOnMaintenance {
-			pool.removeAbandoned(ac)
+			pool.removeAbandoned(ctx, ac)
 		}
 	}()
 
@@ -582,7 +589,8 @@ func (pool *ObjectPool) evict() {
 	evictionConfig := EvictionConfig{
 		IdleEvictTime:     pool.Config.MinEvictableIdleTimeMillis,
 		IdleSoftEvictTime: pool.Config.SoftMinEvictableIdleTimeMillis,
-		MinIdle:           pool.Config.MinIdle}
+		MinIdle:           pool.Config.MinIdle,
+		Context:           pool.Config.EvitionContext}
 
 	testWhileIdle := pool.Config.TestWhileIdle
 	for i, m := 0, pool.getNumTests(); i < m; i++ {
@@ -617,26 +625,26 @@ func (pool *ObjectPool) evict() {
 		evict := evictionPolicy.Evict(&evictionConfig, underTest, pool.idleObjects.Size())
 
 		if evict {
-			pool.destroy(underTest)
+			pool.destroy(ctx, underTest)
 			pool.destroyedByEvictorCount.IncrementAndGet()
 		} else {
 			active := false
 			if testWhileIdle {
-				err := pool.factory.ActivateObject(underTest)
+				err := pool.factory.ActivateObject(ctx, underTest)
 				if err == nil {
 					active = true
 				} else {
-					pool.destroy(underTest)
+					pool.destroy(ctx, underTest)
 					pool.destroyedByEvictorCount.IncrementAndGet()
 				}
 				if active {
-					if !pool.factory.ValidateObject(underTest) {
-						pool.destroy(underTest)
+					if !pool.factory.ValidateObject(ctx, underTest) {
+						pool.destroy(ctx, underTest)
 						pool.destroyedByEvictorCount.IncrementAndGet()
 					} else {
-						err := pool.factory.PassivateObject(underTest)
+						err := pool.factory.PassivateObject(ctx, underTest)
 						if err != nil {
-							pool.destroy(underTest)
+							pool.destroy(ctx, underTest)
 							pool.destroyedByEvictorCount.IncrementAndGet()
 						}
 					}
@@ -648,25 +656,24 @@ func (pool *ObjectPool) evict() {
 			}
 		}
 	}
-
 }
 
-func (pool *ObjectPool) ensureMinIdle() {
-	pool.ensureIdle(pool.getMinIdle(), true)
+func (pool *ObjectPool) ensureMinIdle(ctx context.Context) {
+	pool.ensureIdle(ctx, pool.getMinIdle(), true)
 }
 
 // PreparePool Tries to ensure that {@link #getMinIdle()} idle instances are available
 // in the pool.
-func (pool *ObjectPool) PreparePool() {
+func (pool *ObjectPool) PreparePool(ctx context.Context) {
 	if pool.getMinIdle() < 1 {
 		return
 	}
-	pool.ensureMinIdle()
+	pool.ensureMinIdle(ctx)
 }
 
 // Prefill is util func for pre fill pool object
-func Prefill(pool *ObjectPool, count int) {
+func Prefill(ctx context.Context, pool *ObjectPool, count int) {
 	for i := 0; i < count; i++ {
-		pool.AddObject()
+		pool.AddObject(ctx)
 	}
 }

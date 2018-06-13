@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"errors"
 	"math"
 	"sync"
@@ -19,8 +20,6 @@ const (
 	// TODO
 	// DEFAULT_FAIRNESS = false
 
-	// DefaultMaxWaitMillis is the default value of ObjectPoolConfig.MaxWaitMillis
-	DefaultMaxWaitMillis = int64(-1)
 	// DefaultMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.MinEvictableIdleTimeMillis
 	DefaultMinEvictableIdleTimeMillis = int64(1000 * 60 * 30)
 	// DefaultSoftMinEvictableIdleTimeMillis is the default value of ObjectPoolConfig.SoftMinEvictableIdleTimeMillis
@@ -137,16 +136,6 @@ type ObjectPoolConfig struct {
 	//Fairness                       bool
 
 	/**
-	 * The maximum amount of time (in milliseconds) the
-	 * ObjectPool.BorrowObject() method should block before return
-	 * a error when the pool is exhausted and
-	 *  BlockWhenExhausted is true. When less than 0, the
-	 * ObjectPool.BorrowObject() method may block indefinitely.
-	 *
-	 */
-	MaxWaitMillis int64
-
-	/**
 	 * The minimum amount of time an object may sit idle in the pool
 	 * before it is eligible for eviction by the idle object evictor (if any -
 	 * see TimeBetweenEvictionRunsMillis . When non-positive,
@@ -191,6 +180,11 @@ type ObjectPoolConfig struct {
 	* if this value changed after ObjectPool created, should call ObjectPool.StartEvictor to take effect.
 	 */
 	TimeBetweenEvictionRunsMillis int64
+
+	/**
+	 * The context.Context to use when the evictor runs in the background.
+	 */
+	EvitionContext context.Context
 }
 
 // NewDefaultPoolConfig return a ObjectPoolConfig instance init with default value.
@@ -200,11 +194,11 @@ func NewDefaultPoolConfig() *ObjectPoolConfig {
 		MaxTotal:                       DefaultMaxTotal,
 		MaxIdle:                        DefaultMaxIdle,
 		MinIdle:                        DefaultMinIdle,
-		MaxWaitMillis:                  DefaultMaxWaitMillis,
 		MinEvictableIdleTimeMillis:     DefaultMinEvictableIdleTimeMillis,
 		SoftMinEvictableIdleTimeMillis: DefaultSoftMinEvictableIdleTimeMillis,
 		NumTestsPerEvictionRun:         DefaultNumTestsPerEvictionRun,
 		EvictionPolicyName:             DefaultEvictionPolicyName,
+		EvitionContext:                 context.Background(),
 		TestOnCreate:                   DefaultTestOnCreate,
 		TestOnBorrow:                   DefaultTestOnBorrow,
 		TestOnReturn:                   DefaultTestOnReturn,
@@ -231,6 +225,7 @@ type EvictionConfig struct {
 	IdleEvictTime     int64
 	IdleSoftEvictTime int64
 	MinIdle           int
+	Context           context.Context
 }
 
 // EvictionPolicy is a interface support custom EvictionPolicy
