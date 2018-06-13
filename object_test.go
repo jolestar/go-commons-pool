@@ -33,7 +33,7 @@ func TestTrackedUse(t *testing.T) {
 	assert.Equal(t, now, trackedUse.GetLastUsed())
 
 	pooledObject := NewPooledObject(object)
-	sleep(20)
+	time.Sleep(20 * time.Millisecond)
 	pooledObject.Allocate()
 	time2 := pooledObject.GetLastUsedTime()
 	assert.True(t, now != time2)
@@ -46,7 +46,7 @@ func TestActiveTime(t *testing.T) {
 	object := &TrackedUseObject{}
 	pooledObject := NewPooledObject(object)
 	pooledObject.Allocate()
-	sleep(20)
+	time.Sleep(20 * time.Millisecond)
 	pooledObject.Deallocate()
 	assert.True(t, pooledObject.GetActiveTime() >= 20*time.Millisecond)
 }

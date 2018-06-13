@@ -69,7 +69,7 @@ func (f *SleepingObjectFactory) MakeObject(context.Context) (*PooledObject, erro
 	if debugTest {
 		fmt.Println("factory MakeObject", f.counter.Get())
 	}
-	sleep(500)
+	time.Sleep(500 * time.Millisecond)
 	return NewPooledObject(getNthObject(int(f.counter.Get()))), nil
 }
 
@@ -77,7 +77,7 @@ func (f *SleepingObjectFactory) DestroyObject(ctx context.Context, object *Poole
 	if debugTest {
 		fmt.Println("factory DestroyObject", object)
 	}
-	sleep(250)
+	time.Sleep(250 * time.Millisecond)
 	return nil
 }
 
@@ -85,7 +85,7 @@ func (f *SleepingObjectFactory) ValidateObject(ctx context.Context, object *Pool
 	if debugTest {
 		fmt.Println("factory ValidateObject", object)
 	}
-	sleep(30)
+	time.Sleep(30 * time.Millisecond)
 	return true
 }
 
@@ -94,7 +94,7 @@ func (f *SleepingObjectFactory) ActivateObject(ctx context.Context, object *Pool
 		fmt.Println("factory ActivateObject", object)
 		defer fmt.Println("factory ActivateObject end")
 	}
-	sleep(10)
+	time.Sleep(10 * time.Millisecond)
 	return nil
 }
 
@@ -102,7 +102,7 @@ func (f *SleepingObjectFactory) PassivateObject(ctx context.Context, object *Poo
 	if debugTest {
 		fmt.Println("factory PassivateObject", object)
 	}
-	sleep(10)
+	time.Sleep(10 * time.Millisecond)
 	return nil
 }
 

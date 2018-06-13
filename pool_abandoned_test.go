@@ -179,7 +179,7 @@ func concurrentReturner(pool *ObjectPool, object *AbandonedTestObject, wait *syn
 	go func() {
 		ctx := context.Background()
 		wait.Wait()
-		sleep(20)
+		time.Sleep(20 * time.Millisecond)
 		pool.ReturnObject(ctx, object)
 	}()
 }
@@ -265,7 +265,7 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedReturn() {
 		fmt.Println("deadMansHash:", deadMansHash)
 	}
 	concurrentReturner(suit.pool, obj, wait)
-	sleep(2000) // abandon checked out instances
+	time.Sleep(2 * time.Second) // abandon checked out instances
 	// Now start a race - returner waits until borrowObject has kicked
 	// off removeAbandoned and then returns an instance that borrowObject
 	// will deem abandoned.  Make sure it is not returned to the borrower.
@@ -298,9 +298,9 @@ func (suit *PoolAbandonedTestSuite) TestAbandonedInvalidate() {
 		obj = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*AbandonedTestObject)
 	}
 
-	sleep(1000)                          // abandon checked out instances and let evictor start
+	time.Sleep(1 * time.Second)          // abandon checked out instances and let evictor start
 	suit.pool.InvalidateObject(ctx, obj) // Should not trigger another destroy / decrement
-	sleep(2000)                          // give evictor time to finish destroys
+	time.Sleep(2 * time.Second)          // give evictor time to finish destroys
 	suit.Equal(0, suit.pool.GetNumActive())
 	suit.Equal(5, suit.pool.GetDestroyedCount())
 }
@@ -329,8 +329,8 @@ func (suit *PoolAbandonedTestSuite) TestRemoveAbandonedWhileReturning() {
 	// then arrange for evictor to run while it is being returned
 	// validation takes a second, evictor runs every 500 ms
 	obj := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
-	sleep(50)                        // abandon obj
-	suit.pool.ReturnObject(ctx, obj) // evictor will run during validation
+	time.Sleep(50 * time.Millisecond) // abandon obj
+	suit.pool.ReturnObject(ctx, obj)  // evictor will run during validation
 	obj2 := suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
 	suit.Equal(obj, obj2)                             // should get original back
 	suit.True(!obj2.(*AbandonedTestObject).destroyed) // and not destroyed
