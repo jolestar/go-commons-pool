@@ -4,11 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/fortytw2/leaktest"
-	"github.com/jolestar/go-commons-pool/collections"
-	"github.com/jolestar/go-commons-pool/concurrent"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"math"
 	"math/rand"
 	"os"
@@ -16,6 +11,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fortytw2/leaktest"
+	"github.com/jolestar/go-commons-pool/collections"
+	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 type TestObject struct {
@@ -755,6 +756,70 @@ func (suit *PoolTestSuite) TestExceptionOnPassivateDuringReturn() {
 	suit.factory.exceptionOnPassivate = true
 	suit.pool.ReturnObject(obj)
 	suit.assertEquals(0, suit.pool.GetNumIdle())
+}
+
+func (suit *PoolTestSuite) TestExceptionOnPassivateDuringReturnWithBorrowWaiting() {
+	suit.pool.Config.MaxTotal = 1
+	suit.pool.Config.BlockWhenExhausted = true
+	suit.factory.exceptionOnPassivate = true
+
+	obj, _ := suit.pool.BorrowObject()
+
+	goBorrow := func(ch chan<- interface{}, pool *ObjectPool) {
+		obj, _ := suit.pool.BorrowObject()
+		ch <- obj
+	}
+
+	ch1 := make(chan interface{})
+	go goBorrow(ch1, suit.pool)
+
+	ch2 := make(chan interface{})
+	go goBorrow(ch2, suit.pool)
+
+	select {
+	case <-ch1:
+		suit.FailNow("Borrowing additional objects should have blocked")
+
+	case <-ch2:
+		suit.FailNow("Borrowing additional objects should have blocked")
+
+	case <-time.After(100 * time.Millisecond):
+		// Just wait a moment to make sure neither of those channels, above, read...
+	}
+
+	suit.pool.ReturnObject(obj)
+
+	select {
+	case obj1 := <-ch1:
+		suit.T().Log("Returning item borrowed (ch1)")
+		suit.pool.ReturnObject(obj1)
+
+	case obj2 := <-ch2:
+		suit.T().Log("Returning item borrowed (ch2)")
+		suit.pool.ReturnObject(obj2)
+
+	case <-time.After(100 * time.Millisecond):
+		// Just wait a moment to make sure neither of those channels, above, read...
+
+		suit.FailNow("Failed to borrow additional objects")
+	}
+
+	// Once again, for the other channel
+
+	select {
+	case obj1 := <-ch1:
+		suit.T().Log("Returning item borrowed (ch1)")
+		suit.pool.ReturnObject(obj1)
+
+	case obj2 := <-ch2:
+		suit.T().Log("Returning item borrowed (ch2)")
+		suit.pool.ReturnObject(obj2)
+
+	case <-time.After(100 * time.Millisecond):
+		// Just wait a moment to make sure neither of those channels, above, read...
+
+		suit.FailNow("Failed to borrow additional objects")
+	}
 }
 
 func (suit *PoolTestSuite) TestExceptionOnDestroyDuringBorrow() {
@@ -1832,6 +1897,16 @@ func (suit *PoolTestSuite) TestMakeObjectError() {
 	suit.factory.exceptionOnMake = true
 	err := suit.pool.AddObject()
 	suit.NotNil(err)
+}
+
+func (suit *PoolTestSuite) TestAddObjectPassivateError() {
+	suit.factory.exceptionOnPassivate = true
+	suit.Equal(0, suit.pool.GetNumActive())
+	suit.Equal(0, suit.pool.GetNumIdle())
+	err := suit.pool.AddObject()
+	suit.EqualError(err, "passivate error")
+	suit.Equal(0, suit.pool.GetNumActive())
+	suit.Equal(0, suit.pool.GetNumIdle())
 }
 
 func (suit *PoolTestSuite) TestReturnObjectError() {
