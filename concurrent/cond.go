@@ -2,7 +2,10 @@ package concurrent
 
 import (
 	"context"
+	"math"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -10,7 +13,7 @@ import (
 type TimeoutCond struct {
 	L          sync.Locker
 	signal     chan int
-	hasWaiters bool
+	hasWaiters uint64
 }
 
 // NewTimeoutCond return a new TimeoutCond
@@ -21,11 +24,11 @@ func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 
 // WaitWithContext waits for a signal, or for the context do be done. Returns true if signaled.
 func (cond *TimeoutCond) WaitWithContext(ctx context.Context) bool {
-	cond.setHasWaiters(true)
+	cond.addWaiter()
 	ch := cond.signal
 	//wait should unlock mutex,  if not will cause deadlock
 	cond.L.Unlock()
-	defer cond.setHasWaiters(false)
+	defer cond.removeWaiter()
 	defer cond.L.Lock()
 
 	select {
@@ -49,22 +52,34 @@ func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, 
 	return remainingTimeout, interrupted
 }
 
-func (cond *TimeoutCond) setHasWaiters(value bool) {
-	cond.hasWaiters = value
+func (cond *TimeoutCond) addWaiter() {
+	v := atomic.AddUint64(&cond.hasWaiters, 1)
+	if v == 0 {
+		panic("too many waiters; max is " + strconv.FormatUint(math.MaxUint64, 10))
+	}
+}
+
+func (cond *TimeoutCond) removeWaiter() {
+	// Decrement. See notes here: https://godoc.org/sync/atomic#AddUint64
+	v := atomic.AddUint64(&cond.hasWaiters, ^uint64(0))
+
+	if v == math.MaxUint64 {
+		panic("removeWaiter called more than once after addWaiter")
+	}
 }
 
 // HasWaiters queries whether any goroutine are waiting on this condition
 func (cond *TimeoutCond) HasWaiters() bool {
-	return cond.hasWaiters
+	return atomic.LoadUint64(&cond.hasWaiters) > 0
 }
 
 // Wait for signal return waiting is interrupted
 func (cond *TimeoutCond) Wait() bool {
-	cond.setHasWaiters(true)
+	cond.addWaiter()
 	//copy signal in lock, avoid data race with Interrupt
 	ch := cond.signal
 	cond.L.Unlock()
-	defer cond.setHasWaiters(false)
+	defer cond.removeWaiter()
 	defer cond.L.Lock()
 	_, ok := <-ch
 	return !ok

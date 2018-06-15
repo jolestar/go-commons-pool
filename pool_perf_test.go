@@ -2,10 +2,10 @@ package pool
 
 import (
 	"fmt"
-	"testing"
-	//"reflect"
-	"github.com/jolestar/go-commons-pool/concurrent"
 	"math/rand"
+	"testing"
+
+	"github.com/jolestar/go-commons-pool/concurrent"
 )
 
 type BenchObject struct {
