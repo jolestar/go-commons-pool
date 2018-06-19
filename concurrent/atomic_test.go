@@ -1,12 +1,15 @@
 package concurrent
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAtomicIncrement(t *testing.T) {
+	t.Parallel()
+
 	i := AtomicInteger(int32(0))
 	v := i.IncrementAndGet()
 	assert.Equal(t, int32(1), v)
@@ -17,6 +20,8 @@ func TestAtomicIncrement(t *testing.T) {
 }
 
 func TestAtomicDecrement(t *testing.T) {
+	t.Parallel()
+
 	i := AtomicInteger(int32(2))
 	v := i.DecrementAndGet()
 	assert.Equal(t, int32(1), v)
@@ -27,6 +32,8 @@ func TestAtomicDecrement(t *testing.T) {
 }
 
 func TestAtomicConcurrentIncrement(t *testing.T) {
+	t.Parallel()
+
 	integer := AtomicInteger(int32(0))
 	count := 100
 	wait := sync.WaitGroup{}
@@ -46,6 +53,8 @@ func TestAtomicConcurrentIncrement(t *testing.T) {
 }
 
 func TestAtomicConcurrentDecrement(t *testing.T) {
+	t.Parallel()
+
 	count := 100
 	integer := AtomicInteger(int32(count))
 	wait := sync.WaitGroup{}
@@ -65,6 +74,8 @@ func TestAtomicConcurrentDecrement(t *testing.T) {
 }
 
 func TestAtomicConcurrentIncrementAndDecrementAndGet(t *testing.T) {
+	t.Parallel()
+
 	count := 100
 	integer := AtomicInteger(0)
 	wait := sync.WaitGroup{}
@@ -89,6 +100,8 @@ func TestAtomicConcurrentIncrementAndDecrementAndGet(t *testing.T) {
 }
 
 func TestAtomicConcurrentGetAndIncrementAndDecrement(t *testing.T) {
+	t.Parallel()
+
 	count := 100
 	integer := AtomicInteger(0)
 	wait := sync.WaitGroup{}

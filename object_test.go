@@ -8,6 +8,8 @@ import (
 )
 
 func TestPooledObject(t *testing.T) {
+	t.Parallel()
+
 	object := &TestObject{Num: 1}
 	pooledObject := NewPooledObject(object)
 	pooledObject.MarkReturning()
@@ -26,6 +28,8 @@ func (o *TrackedUseObject) GetLastUsed() time.Time {
 }
 
 func TestTrackedUse(t *testing.T) {
+	t.Parallel()
+
 	now := time.Now()
 	object := &TrackedUseObject{lastUsed: now}
 	var trackedUse TrackedUse
@@ -43,6 +47,8 @@ func TestTrackedUse(t *testing.T) {
 }
 
 func TestActiveTime(t *testing.T) {
+	t.Parallel()
+
 	object := &TrackedUseObject{}
 	pooledObject := NewPooledObject(object)
 	pooledObject.Allocate()

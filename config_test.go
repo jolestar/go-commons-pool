@@ -8,6 +8,8 @@ import (
 )
 
 func TestPoolConfig(t *testing.T) {
+	t.Parallel()
+
 	config := NewDefaultPoolConfig()
 	if debugTest {
 		fmt.Println(config)
@@ -16,11 +18,15 @@ func TestPoolConfig(t *testing.T) {
 }
 
 func TestGetEvictionPolicy(t *testing.T) {
+	t.Parallel()
+
 	policy := GetEvictionPolicy(DefaultEvictionPolicyName)
 	assert.NotNil(t, policy)
 }
 
 func TestDefaultConfig(t *testing.T) {
+	t.Parallel()
+
 	config := NewDefaultPoolConfig()
 	assert.Equal(t, DefaultBlockWhenExhausted, config.BlockWhenExhausted)
 	assert.Equal(t, DefaultEvictionPolicyName, config.EvictionPolicyName)
