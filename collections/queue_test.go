@@ -1,15 +1,17 @@
 package collections
 
 import (
+	"context"
 	"fmt"
-	"github.com/jolestar/go-commons-pool/concurrent"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 var ONE = 1
@@ -77,28 +79,31 @@ func (suit *LinkedBlockDequeTestSuite) TestOfferLast() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestPutFirst() {
-	suit.deque.PutFirst(nil)
-	suit.deque.PutFirst(ONE)
-	suit.deque.PutFirst(TWO)
+	ctx := context.Background()
+	suit.deque.PutFirst(ctx, nil)
+	suit.deque.PutFirst(ctx, ONE)
+	suit.deque.PutFirst(ctx, TWO)
 	suit.Equal(2, suit.deque.Size())
 	suit.Equal(TWO, suit.deque.PollFirst())
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestPutLast() {
-	suit.deque.PutLast(nil)
-	suit.deque.PutLast(ONE)
-	suit.deque.PutLast(TWO)
+	ctx := context.Background()
+	suit.deque.PutLast(ctx, nil)
+	suit.deque.PutLast(ctx, ONE)
+	suit.deque.PutLast(ctx, TWO)
 	suit.Equal(2, suit.deque.Size())
 	suit.Equal(ONE, suit.deque.PollFirst())
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestPutLastWait() {
-	suit.deque.PutLast(ONE)
-	suit.deque.PutLast(TWO)
+	ctx := context.Background()
+	suit.deque.PutLast(ctx, ONE)
+	suit.deque.PutLast(ctx, TWO)
 	wait := sync.WaitGroup{}
 	wait.Add(1)
 	go func() {
-		suit.deque.PutLast(THREE)
+		suit.deque.PutLast(ctx, THREE)
 		wait.Done()
 	}()
 	sleep(100)
@@ -109,15 +114,16 @@ func (suit *LinkedBlockDequeTestSuite) TestPutLastWait() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestPutFirstWait() {
-	suit.deque.PutFirst(ONE)
-	suit.deque.PutFirst(TWO)
+	ctx := context.Background()
+	suit.deque.PutFirst(ctx, ONE)
+	suit.deque.PutFirst(ctx, TWO)
 	wait := sync.WaitGroup{}
 	wait.Add(1)
 	go func() {
-		suit.deque.PutFirst(THREE)
+		suit.deque.PutFirst(ctx, THREE)
 		wait.Done()
 	}()
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	suit.Equal(TWO, suit.deque.PollFirst())
 	wait.Wait()
 	suit.Equal(2, suit.deque.Size())
@@ -139,15 +145,17 @@ func (suit *LinkedBlockDequeTestSuite) TestPollLast() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestTakeFirst() {
+	ctx := context.Background()
 	assert.True(suit.T(), suit.deque.OfferFirst(ONE))
 	assert.True(suit.T(), suit.deque.OfferFirst(TWO))
-	suit.Equal(TWO, suit.NoErrorWithResult(suit.deque.TakeFirst()))
+	suit.Equal(TWO, suit.NoErrorWithResult(suit.deque.TakeFirst(ctx)))
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestTakeFirstWait() {
+	ctx := context.Background()
 	ch := make(chan interface{}, 1)
 	go func() {
-		o, _ := suit.deque.TakeFirst()
+		o, _ := suit.deque.TakeFirst(ctx)
 		ch <- o
 	}()
 	sleep(100)
@@ -158,9 +166,10 @@ func (suit *LinkedBlockDequeTestSuite) TestTakeFirstWait() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestTakeLastWait() {
+	ctx := context.Background()
 	ch := make(chan interface{}, 1)
 	go func() {
-		o, _ := suit.deque.TakeLast()
+		o, _ := suit.deque.TakeLast(ctx)
 		ch <- o
 	}()
 	sleep(100)
@@ -171,9 +180,10 @@ func (suit *LinkedBlockDequeTestSuite) TestTakeLastWait() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestTakeLast() {
+	ctx := context.Background()
 	assert.True(suit.T(), suit.deque.OfferFirst(ONE))
 	assert.True(suit.T(), suit.deque.OfferFirst(TWO))
-	suit.Equal(ONE, suit.NoErrorWithResult(suit.deque.TakeLast()))
+	suit.Equal(ONE, suit.NoErrorWithResult(suit.deque.TakeLast(ctx)))
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestRemoveFirstOccurence() {
@@ -220,6 +230,7 @@ func (suit *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestInterrupt() {
+	ctx := context.Background()
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	go func() {
@@ -231,7 +242,7 @@ func (suit *LinkedBlockDequeTestSuite) TestInterrupt() {
 		}
 	}()
 	for i := 0; i < 2; i++ {
-		_, e := suit.deque.TakeFirst()
+		_, e := suit.deque.TakeFirst(ctx)
 		_, ok := e.(*InterruptedErr)
 		suit.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
 		suit.NotNil(e.Error())
@@ -326,15 +337,16 @@ func (suit *LinkedBlockDequeTestSuite) TestIteratorRemove() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestQueueLock() {
+	ctx := context.Background()
 	suit.deque = NewDeque(1)
 	ch := make(chan int)
 	go func() {
-		ch <- suit.NoErrorWithResult(suit.deque.TakeFirst()).(int)
+		ch <- suit.NoErrorWithResult(suit.deque.TakeFirst(ctx)).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	//time.Sleep(time.Duration(1)*time.Second)
 	go func() {
-		suit.deque.PutFirst(1)
+		suit.deque.PutFirst(ctx, 1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
@@ -343,12 +355,13 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueLock() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
+	ctx := context.Background()
 	count := 100
 	suit.deque = NewDeque(count)
 	ch := make(chan int, count)
 	for i := 0; i < count; i++ {
 		go func() {
-			ch <- suit.NoErrorWithResult(suit.deque.TakeFirst()).(int)
+			ch <- suit.NoErrorWithResult(suit.deque.TakeFirst(ctx)).(int)
 		}()
 	}
 	sleep(100)
@@ -399,7 +412,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 	}
 	for i := 0; i < count/2; i++ {
 		go func(val int) {
-			sleep(int(rand.Int31n(int32(timeout))))
+			time.Sleep(time.Duration(rand.Int31n(int32(timeout))) * time.Millisecond)
 			suit.deque.AddFirst(val)
 		}(i)
 	}
@@ -421,6 +434,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestQueuePutAndPullTimeout() {
+	ctx := context.Background()
 	suit.deque = NewDeque(1)
 	ch := make(chan int)
 	timeout := time.Duration(500) * time.Millisecond
@@ -430,7 +444,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueuePutAndPullTimeout() {
 	}()
 	time.Sleep(time.Duration(100) * time.Millisecond)
 	go func() {
-		suit.deque.PutFirst(1)
+		suit.deque.PutFirst(ctx, 1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
@@ -439,6 +453,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueuePutAndPullTimeout() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaitersWithTimeout() {
+	ctx := context.Background()
 	suit.deque = NewDeque(1)
 	suit.False(suit.deque.HasTakeWaiters())
 	timeout := time.Duration(500) * time.Millisecond
@@ -450,7 +465,7 @@ func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaitersWithTimeout() {
 	time.Sleep(time.Duration(50) * time.Millisecond)
 	suit.True(suit.deque.HasTakeWaiters())
 	go func() {
-		suit.deque.PutFirst(1)
+		suit.deque.PutFirst(ctx, 1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
@@ -460,17 +475,18 @@ func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaitersWithTimeout() {
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaiters() {
+	ctx := context.Background()
 	suit.deque = NewDeque(1)
 	suit.False(suit.deque.HasTakeWaiters())
 	ch := make(chan int)
 	go func() {
-		ch <- suit.NoErrorWithResult(suit.deque.TakeFirst()).(int)
+		ch <- suit.NoErrorWithResult(suit.deque.TakeFirst(ctx)).(int)
 		fmt.Printf("TestQueueLock take finish.\n")
 	}()
 	time.Sleep(time.Duration(50) * time.Millisecond)
 	suit.True(suit.deque.HasTakeWaiters())
 	go func() {
-		suit.deque.PutFirst(1)
+		suit.deque.PutFirst(ctx, 1)
 		fmt.Printf("TestQueueLock put finish.\n")
 	}()
 	val := <-ch
