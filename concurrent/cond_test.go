@@ -87,33 +87,25 @@ func TestTimeoutCondWaitTimeoutNotify(t *testing.T) {
 	obj := NewLockTestObject(t)
 	wait := sync.WaitGroup{}
 	wait.Add(2)
-	ch := make(chan int, 1)
-	timeout := 2000
+	ch := make(chan time.Duration, 1)
+	timeout := 2 * time.Second
 	go func() {
-		begin := currentTimeMillis()
+		begin := time.Now()
 		obj.lockAndWaitWithTimeout(time.Duration(timeout) * time.Millisecond)
-		end := currentTimeMillis()
-		ch <- int((end - begin))
+		elapsed := time.Since(begin)
+		ch <- elapsed
 		wait.Done()
 	}()
-	sleep(200)
+	time.Sleep(200 * time.Millisecond)
 	go func() {
 		obj.lockAndSignal()
 		wait.Done()
 	}()
 	wait.Wait()
-	time := <-ch
+	elapsed := <-ch
 	close(ch)
-	assert.True(t, time < timeout)
-	assert.True(t, time >= 200)
-}
-
-func sleep(millisecond int) {
-	time.Sleep(time.Duration(millisecond) * time.Millisecond)
-}
-
-func currentTimeMillis() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
+	assert.True(t, elapsed < timeout)
+	assert.True(t, elapsed >= 200*time.Millisecond)
 }
 
 func TestTimeoutCondWaitTimeoutRemain(t *testing.T) {
@@ -130,7 +122,7 @@ func TestTimeoutCondWaitTimeoutRemain(t *testing.T) {
 		ch <- remainTimeout
 		wait.Done()
 	}()
-	sleep(200)
+	time.Sleep(200 * time.Millisecond)
 	go func() {
 		obj.lockAndSignal()
 		wait.Done()
@@ -198,7 +190,7 @@ func TestInterrupted(t *testing.T) {
 			wait.Done()
 		}()
 	}
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	go func() { obj.cond.Interrupt() }()
 	wait.Wait()
 	for i := 0; i < count; i++ {
@@ -224,7 +216,7 @@ func TestInterruptedWithTimeout(t *testing.T) {
 			wait.Done()
 		}()
 	}
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	go func() { obj.cond.Interrupt() }()
 	wait.Wait()
 	for i := 0; i < count; i++ {

@@ -106,7 +106,7 @@ func (suit *LinkedBlockDequeTestSuite) TestPutLastWait() {
 		suit.deque.PutLast(ctx, THREE)
 		wait.Done()
 	}()
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	suit.Equal(TWO, suit.deque.PollLast())
 	wait.Wait()
 	suit.Equal(2, suit.deque.Size())
@@ -158,7 +158,7 @@ func (suit *LinkedBlockDequeTestSuite) TestTakeFirstWait() {
 		o, _ := suit.deque.TakeFirst(ctx)
 		ch <- o
 	}()
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	suit.True(suit.deque.OfferFirst(ONE))
 	o := <-ch
 	close(ch)
@@ -172,7 +172,7 @@ func (suit *LinkedBlockDequeTestSuite) TestTakeLastWait() {
 		o, _ := suit.deque.TakeLast(ctx)
 		ch <- o
 	}()
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	suit.True(suit.deque.OfferFirst(ONE))
 	o := <-ch
 	close(ch)
@@ -364,7 +364,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 			ch <- suit.NoErrorWithResult(suit.deque.TakeFirst(ctx)).(int)
 		}()
 	}
-	sleep(100)
+	time.Sleep(100 * time.Millisecond)
 	for i := 0; i < count; i++ {
 		go func(val int) {
 			suit.deque.AddFirst(val)
@@ -383,28 +383,20 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrent() {
 	//suit.Equal(1, val)
 }
 
-func currentTimeMillis() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
-}
-
-func sleep(millisecond int) {
-	time.Sleep(time.Duration(millisecond) * time.Millisecond)
-}
-
 func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 	suit.deque = NewDeque(10)
 	count := 20
 	ch := make(chan int, count/2)
-	timeoutChan := make(chan int, count/2)
-	timeout := 1000
+	timeoutChan := make(chan time.Duration, count/2)
+	timeout := 1 * time.Second
 	for i := 0; i < count; i++ {
 		go func() {
-			startWait := currentTimeMillis()
-			r := suit.NoErrorWithResult(suit.deque.PollFirstWithTimeout(time.Duration(timeout) * time.Millisecond))
-			endWait := currentTimeMillis()
+			startWait := time.Now()
+			r := suit.NoErrorWithResult(suit.deque.PollFirstWithTimeout(timeout))
+			waitElapsed := time.Since(startWait)
 			//timeout
 			if r == nil {
-				timeoutChan <- int((endWait - startWait))
+				timeoutChan <- waitElapsed
 			} else {
 				ch <- r.(int)
 			}
@@ -412,7 +404,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 	}
 	for i := 0; i < count/2; i++ {
 		go func(val int) {
-			time.Sleep(time.Duration(rand.Int31n(int32(timeout))) * time.Millisecond)
+			time.Sleep(time.Duration(rand.Int63n(int64(timeout))))
 			suit.deque.AddFirst(val)
 		}(i)
 	}
@@ -420,7 +412,7 @@ func (suit *LinkedBlockDequeTestSuite) TestQueueConcurrentTimeout() {
 		t := <-timeoutChan
 		//fmt.Println(t)
 		if t < timeout {
-			suit.Fail(fmt.Sprintf("%v timeout %v < 1000", t, i))
+			suit.Fail(fmt.Sprintf("%v timeout %v < %v", t, i, timeout))
 		}
 	}
 	close(timeoutChan)

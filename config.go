@@ -175,7 +175,7 @@ type ObjectPoolConfig struct {
 	EvictionPolicyName string
 
 	/**
-	* The number of milliseconds to sleep between runs of the idle
+	* The amount of time sleep between runs of the idle
 	* object evictor goroutine. When non-positive, no idle object evictor goroutine
 	* will be run.
 	* if this value changed after ObjectPool created, should call ObjectPool.StartEvictor to take effect.
