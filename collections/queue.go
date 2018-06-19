@@ -1,10 +1,12 @@
 package collections
 
 import (
+	"context"
 	"errors"
-	"github.com/jolestar/go-commons-pool/concurrent"
 	"sync"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/concurrent"
 )
 
 // InterruptedErr when deque block method bean interrupted will return this err
@@ -268,24 +270,36 @@ func (q *LinkedBlockingDeque) PollFirst() (e interface{}) {
 	return result
 }
 
-// PollFirstWithTimeout retrieves and removes the first element of this deque, waiting
-// up to the specified wait time if necessary for an element to become available.
+// PollFirstWithContext retrieves and removes the first element of this deque, waiting
+// until the context is done if necessary for an element to become available.
 // return NewInterruptedErr when waiting bean interrupted
-func (q *LinkedBlockingDeque) PollFirstWithTimeout(timeout time.Duration) (interface{}, error) {
+func (q *LinkedBlockingDeque) PollFirstWithContext(ctx context.Context) (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	var x interface{}
 	interrupt := false
 	for x = q.unlinkFirst(); x == nil; x = q.unlinkFirst() {
-		if timeout <= 0 {
-			break
-		}
 		if interrupt {
 			return nil, NewInterruptedErr()
 		}
-		timeout, interrupt = q.notEmpty.WaitWithTimeout(timeout)
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		default:
+		}
+		interrupt = q.notEmpty.WaitWithContext(ctx)
 	}
 	return x, nil
+}
+
+// PollFirstWithTimeout retrieves and removes the first element of this deque, waiting
+// up to the specified wait time if necessary for an element to become available.
+// return NewInterruptedErr when waiting bean interrupted
+func (q *LinkedBlockingDeque) PollFirstWithTimeout(timeout time.Duration) (interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return q.PollFirstWithContext(ctx)
 }
 
 // PollLast retrieves and removes the last element of this deque,
@@ -297,24 +311,36 @@ func (q *LinkedBlockingDeque) PollLast() interface{} {
 	return result
 }
 
-// PollLastWithTimeout retrieves and removes the last element of this deque, waiting
-// up to the specified wait time if necessary for an element to become available.
+// PollLastWithContext retrieves and removes the last element of this deque, waiting
+// until the context is done if necessary for an element to become available.
 // return NewInterruptedErr when waiting bean interrupted
-func (q *LinkedBlockingDeque) PollLastWithTimeout(timeout time.Duration) (interface{}, error) {
+func (q *LinkedBlockingDeque) PollLastWithContext(ctx context.Context) (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	var x interface{}
 	interrupt := false
 	for x = q.unlinkLast(); x == nil; x = q.unlinkLast() {
-		if timeout <= 0 {
-			break
-		}
 		if interrupt {
 			return nil, NewInterruptedErr()
 		}
-		timeout, interrupt = q.notEmpty.WaitWithTimeout(timeout)
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		default:
+		}
+		interrupt = q.notEmpty.WaitWithContext(ctx)
 	}
 	return x, nil
+}
+
+// PollLastWithTimeout retrieves and removes the last element of this deque, waiting
+// up to the specified wait time if necessary for an element to become available.
+// return NewInterruptedErr when waiting bean interrupted
+func (q *LinkedBlockingDeque) PollLastWithTimeout(timeout time.Duration) (interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return q.PollLastWithContext(ctx)
 }
 
 // TakeFirst unlink the first element in the queue, waiting until there is an element
