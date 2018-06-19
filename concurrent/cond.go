@@ -39,19 +39,6 @@ func (cond *TimeoutCond) WaitWithContext(ctx context.Context) bool {
 	}
 }
 
-// WaitWithTimeout wait for signal return remain wait time, and is interrupted
-func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	begin := time.Now()
-	interrupted := cond.WaitWithContext(ctx)
-	elapsed := time.Since(begin)
-	remainingTimeout := timeout - elapsed
-
-	return remainingTimeout, interrupted
-}
-
 func (cond *TimeoutCond) addWaiter() {
 	v := atomic.AddUint64(&cond.hasWaiters, 1)
 	if v == 0 {

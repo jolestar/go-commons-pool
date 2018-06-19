@@ -363,9 +363,6 @@ func (suit *PoolAbandonedTestSuite) TestWhenExhaustedBlock() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	start := currentTimeMillis()
 	o2 := suit.NoErrorWithResult(suit.pool.borrowObject(ctx))
 	end := currentTimeMillis()
