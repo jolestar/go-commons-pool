@@ -231,7 +231,10 @@ func (suit *LinkedBlockDequeTestSuite) TestPollFirstWithTimeout() {
 
 func (suit *LinkedBlockDequeTestSuite) TestPollLastWithTimeout() {
 	assert.Nil(suit.T(), suit.deque.PollLast())
-	assert.Nil(suit.T(), suit.NoErrorWithResult(suit.deque.PollLastWithTimeout(50*time.Millisecond)))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	assert.Nil(suit.T(), suit.NoErrorWithResult(suit.deque.PollLastWithContext(ctx)))
 }
 
 func (suit *LinkedBlockDequeTestSuite) TestInterrupt() {
