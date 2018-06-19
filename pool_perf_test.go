@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -13,16 +14,17 @@ type BenchObject struct {
 }
 
 func BenchmarkPoolBorrowReturn(b *testing.B) {
-	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(func() (interface{}, error) {
+	ctx := context.Background()
+	pool := NewObjectPoolWithDefaultConfig(ctx, NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
 		return &BenchObject{Num: rand.Int31()}, nil
 	}))
-	defer pool.Close()
+	defer pool.Close(ctx)
 	for i := 0; i < b.N; i++ {
-		o, err := pool.BorrowObject()
+		o, err := pool.BorrowObject(ctx)
 		if err != nil {
 			b.Fail()
 		}
-		err = pool.ReturnObject(o)
+		err = pool.ReturnObject(ctx, o)
 		if err != nil {
 			b.Fail()
 		}
@@ -30,20 +32,21 @@ func BenchmarkPoolBorrowReturn(b *testing.B) {
 }
 
 func BenchmarkPoolBorrowReturnParallel(b *testing.B) {
-	pool := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(func() (interface{}, error) {
+	ctx := context.Background()
+	pool := NewObjectPoolWithDefaultConfig(ctx, NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
 		return &BenchObject{}, nil
 	}))
 	pool.Config.MaxTotal = 100
-	defer pool.Close()
+	defer pool.Close(ctx)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			o, err := pool.BorrowObject()
+			o, err := pool.BorrowObject(ctx)
 			//fmt.Println("borrow:",reflect.ValueOf(o).Pointer())
 			if err != nil {
 				fmt.Println(err)
 				b.Fail()
 			}
-			err = pool.ReturnObject(o)
+			err = pool.ReturnObject(ctx, o)
 			//fmt.Println("return:",reflect.ValueOf(o).Pointer())
 			if err != nil {
 				fmt.Println(err)
@@ -61,7 +64,7 @@ func NewSleepingObjectFactory() *SleepingObjectFactory {
 	return &SleepingObjectFactory{counter: concurrent.AtomicInteger(0)}
 }
 
-func (f *SleepingObjectFactory) MakeObject() (*PooledObject, error) {
+func (f *SleepingObjectFactory) MakeObject(context.Context) (*PooledObject, error) {
 	if debugTest {
 		fmt.Println("factory MakeObject", f.counter.Get())
 	}
@@ -69,7 +72,7 @@ func (f *SleepingObjectFactory) MakeObject() (*PooledObject, error) {
 	return NewPooledObject(getNthObject(int(f.counter.Get()))), nil
 }
 
-func (f *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
+func (f *SleepingObjectFactory) DestroyObject(ctx context.Context, object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory DestroyObject", object)
 	}
@@ -77,7 +80,7 @@ func (f *SleepingObjectFactory) DestroyObject(object *PooledObject) error {
 	return nil
 }
 
-func (f *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
+func (f *SleepingObjectFactory) ValidateObject(ctx context.Context, object *PooledObject) bool {
 	if debugTest {
 		fmt.Println("factory ValidateObject", object)
 	}
@@ -85,7 +88,7 @@ func (f *SleepingObjectFactory) ValidateObject(object *PooledObject) bool {
 	return true
 }
 
-func (f *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
+func (f *SleepingObjectFactory) ActivateObject(ctx context.Context, object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory ActivateObject", object)
 		defer fmt.Println("factory ActivateObject end")
@@ -94,7 +97,7 @@ func (f *SleepingObjectFactory) ActivateObject(object *PooledObject) error {
 	return nil
 }
 
-func (f *SleepingObjectFactory) PassivateObject(object *PooledObject) error {
+func (f *SleepingObjectFactory) PassivateObject(ctx context.Context, object *PooledObject) error {
 	if debugTest {
 		fmt.Println("factory PassivateObject", object)
 	}
@@ -110,13 +113,13 @@ type TaskStats struct {
 	nrSamples       int
 }
 
-func runOnce(pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
+func runOnce(ctx context.Context, pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
 	taskStats.waiting++
 	if debugTest {
 		fmt.Println("   waiting: ", taskStats.waiting, "   complete: ", taskStats.complete)
 	}
 	bbegin := currentTimeMillis()
-	o, _ := pool.BorrowObject()
+	o, _ := pool.BorrowObject(ctx)
 	bend := currentTimeMillis()
 	taskStats.waiting--
 
@@ -127,7 +130,7 @@ func runOnce(pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
 	}
 
 	rbegin := currentTimeMillis()
-	pool.ReturnObject(o)
+	pool.ReturnObject(ctx, o)
 	rend := currentTimeMillis()
 	taskStats.complete++
 	borrowTime := bend - bbegin
@@ -135,13 +138,13 @@ func runOnce(pool *ObjectPool, taskStats *TaskStats) (int64, int64) {
 	return borrowTime, returnTime
 }
 
-func prefTask(pool *ObjectPool, nrIterations int) chan TaskStats {
+func prefTask(ctx context.Context, pool *ObjectPool, nrIterations int) chan TaskStats {
 	ch := make(chan TaskStats, 1)
 	go func() {
 		taskStats := TaskStats{}
-		runOnce(pool, &taskStats) // warmup
+		runOnce(ctx, pool, &taskStats) // warmup
 		for i := 0; i < nrIterations; i++ {
-			borrowTime, returnTime := runOnce(pool, &taskStats)
+			borrowTime, returnTime := runOnce(ctx, pool, &taskStats)
 			taskStats.totalBorrowTime += borrowTime
 			taskStats.totalReturnTime += returnTime
 			taskStats.nrSamples++
@@ -157,16 +160,16 @@ func prefTask(pool *ObjectPool, nrIterations int) chan TaskStats {
 	return ch
 }
 
-func perfRun(iterations int, nrThreads int, maxTotal int, maxIdle int) {
+func perfRun(ctx context.Context, iterations int, nrThreads int, maxTotal int, maxIdle int) {
 	factory := NewSleepingObjectFactory()
 
-	pool := NewObjectPoolWithDefaultConfig(factory)
+	pool := NewObjectPoolWithDefaultConfig(ctx, factory)
 	pool.Config.MaxTotal = maxTotal
 	pool.Config.MaxIdle = maxIdle
 	pool.Config.TestOnBorrow = true
 	chs := make([]chan TaskStats, nrThreads)
 	for i := 0; i < nrThreads; i++ {
-		chs[i] = prefTask(pool, iterations)
+		chs[i] = prefTask(ctx, pool, iterations)
 	}
 
 	aggregate := TaskStats{}
@@ -194,20 +197,20 @@ func perfRun(iterations int, nrThreads int, maxTotal int, maxIdle int) {
 		aggregate.totalReturnTime/int64(aggregate.nrSamples))
 }
 
-func perfMain() {
+func perfMain(ctx context.Context) {
 	fmt.Println("Increase threads")
-	perfRun(1, 50, 5, 5)
-	perfRun(1, 100, 5, 5)
-	perfRun(1, 200, 5, 5)
-	perfRun(1, 400, 5, 5)
+	perfRun(ctx, 1, 50, 5, 5)
+	perfRun(ctx, 1, 100, 5, 5)
+	perfRun(ctx, 1, 200, 5, 5)
+	perfRun(ctx, 1, 400, 5, 5)
 
 	fmt.Println("Increase threads & poolsize")
-	perfRun(1, 50, 5, 5)
-	perfRun(1, 100, 10, 10)
-	perfRun(1, 200, 20, 20)
-	perfRun(1, 400, 40, 40)
+	perfRun(ctx, 1, 50, 5, 5)
+	perfRun(ctx, 1, 100, 10, 10)
+	perfRun(ctx, 1, 200, 20, 20)
+	perfRun(ctx, 1, 400, 40, 40)
 
 	fmt.Println("Increase maxIdle")
-	perfRun(1, 400, 40, 5)
-	perfRun(1, 400, 40, 40)
+	perfRun(ctx, 1, 400, 40, 5)
+	perfRun(ctx, 1, 400, 40, 40)
 }

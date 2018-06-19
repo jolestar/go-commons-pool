@@ -22,36 +22,6 @@ func NewTimeoutCond(l sync.Locker) *TimeoutCond {
 	return &cond
 }
 
-// WaitWithContext waits for a signal, or for the context do be done. Returns true if signaled.
-func (cond *TimeoutCond) WaitWithContext(ctx context.Context) bool {
-	cond.addWaiter()
-	ch := cond.signal
-	//wait should unlock mutex,  if not will cause deadlock
-	cond.L.Unlock()
-	defer cond.removeWaiter()
-	defer cond.L.Lock()
-
-	select {
-	case _, ok := <-ch:
-		return !ok
-	case <-ctx.Done():
-		return false
-	}
-}
-
-// WaitWithTimeout wait for signal return remain wait time, and is interrupted
-func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	begin := time.Now()
-	interrupted := cond.WaitWithContext(ctx)
-	elapsed := time.Since(begin)
-	remainingTimeout := timeout - elapsed
-
-	return remainingTimeout, interrupted
-}
-
 func (cond *TimeoutCond) addWaiter() {
 	v := atomic.AddUint64(&cond.hasWaiters, 1)
 	if v == 0 {
@@ -73,16 +43,35 @@ func (cond *TimeoutCond) HasWaiters() bool {
 	return atomic.LoadUint64(&cond.hasWaiters) > 0
 }
 
-// Wait for signal return waiting is interrupted
-func (cond *TimeoutCond) Wait() bool {
+// WaitWithTimeout wait for signal return remain wait time, and is interrupted
+func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	begin := time.Now()
+	interrupted := cond.Wait(ctx)
+	elapsed := time.Since(begin)
+	remainingTimeout := timeout - elapsed
+
+	return remainingTimeout, interrupted
+}
+
+// Wait waits for a signal, or for the context do be done. Returns true if signaled.
+func (cond *TimeoutCond) Wait(ctx context.Context) bool {
 	cond.addWaiter()
 	//copy signal in lock, avoid data race with Interrupt
 	ch := cond.signal
+	//wait should unlock mutex,  if not will cause deadlock
 	cond.L.Unlock()
 	defer cond.removeWaiter()
 	defer cond.L.Lock()
-	_, ok := <-ch
-	return !ok
+
+	select {
+	case _, ok := <-ch:
+		return !ok
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // Signal wakes one goroutine waiting on c, if there is any.

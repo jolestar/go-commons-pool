@@ -237,27 +237,27 @@ func (q *LinkedBlockingDeque) OfferLast(e interface{}) bool {
 
 // PutFirst link the provided element as the first in the queue, waiting until there
 // is space to do so if the queue is full.
-func (q *LinkedBlockingDeque) PutFirst(e interface{}) {
+func (q *LinkedBlockingDeque) PutFirst(ctx context.Context, e interface{}) {
 	if e == nil {
 		return
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	for !q.linkFirst(e) {
-		q.notFull.Wait()
+		q.notFull.Wait(ctx)
 	}
 }
 
 // PutLast Link the provided element as the last in the queue, waiting until there
 // is space to do so if the queue is full.
-func (q *LinkedBlockingDeque) PutLast(e interface{}) {
+func (q *LinkedBlockingDeque) PutLast(ctx context.Context, e interface{}) {
 	if e == nil {
 		return
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	for !q.linkLast(e) {
-		q.notFull.Wait()
+		q.notFull.Wait(ctx)
 	}
 }
 
@@ -287,7 +287,7 @@ func (q *LinkedBlockingDeque) PollFirstWithContext(ctx context.Context) (interfa
 			return nil, nil
 		default:
 		}
-		interrupt = q.notEmpty.WaitWithContext(ctx)
+		interrupt = q.notEmpty.Wait(ctx)
 	}
 	return x, nil
 }
@@ -328,7 +328,7 @@ func (q *LinkedBlockingDeque) PollLastWithContext(ctx context.Context) (interfac
 			return nil, nil
 		default:
 		}
-		interrupt = q.notEmpty.WaitWithContext(ctx)
+		interrupt = q.notEmpty.Wait(ctx)
 	}
 	return x, nil
 }
@@ -346,7 +346,7 @@ func (q *LinkedBlockingDeque) PollLastWithTimeout(timeout time.Duration) (interf
 // TakeFirst unlink the first element in the queue, waiting until there is an element
 // to unlink if the queue is empty.
 // return NewInterruptedErr if wait condition is interrupted
-func (q *LinkedBlockingDeque) TakeFirst() (interface{}, error) {
+func (q *LinkedBlockingDeque) TakeFirst(ctx context.Context) (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	var x interface{}
@@ -355,7 +355,7 @@ func (q *LinkedBlockingDeque) TakeFirst() (interface{}, error) {
 		if interrupt {
 			return nil, NewInterruptedErr()
 		}
-		interrupt = q.notEmpty.Wait()
+		interrupt = q.notEmpty.Wait(ctx)
 	}
 	return x, nil
 }
@@ -363,7 +363,7 @@ func (q *LinkedBlockingDeque) TakeFirst() (interface{}, error) {
 // TakeLast unlink the last element in the queue, waiting until there is an element
 // to unlink if the queue is empty.
 // return NewInterruptedErr if wait condition is interrupted
-func (q *LinkedBlockingDeque) TakeLast() (interface{}, error) {
+func (q *LinkedBlockingDeque) TakeLast(ctx context.Context) (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	var x interface{}
@@ -372,7 +372,7 @@ func (q *LinkedBlockingDeque) TakeLast() (interface{}, error) {
 		if interrupt {
 			return nil, NewInterruptedErr()
 		}
-		interrupt = q.notEmpty.Wait()
+		interrupt = q.notEmpty.Wait(ctx)
 	}
 	return x, nil
 }

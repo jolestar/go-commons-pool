@@ -1,6 +1,7 @@
 package concurrent
 
 import (
+	"context"
 	"math"
 	"sync"
 	"testing"
@@ -32,7 +33,7 @@ func (o *LockTestObject) lockAndWait() bool {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	o.t.Log("lockAndWait")
-	return o.cond.Wait()
+	return o.cond.Wait(context.Background())
 }
 
 func (o *LockTestObject) lockAndSignal() {

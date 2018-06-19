@@ -1,67 +1,80 @@
 package pool
 
 import (
+	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type MyPoolObject struct {
 }
 
 func TestExample(t *testing.T) {
-	p := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
-		func() (interface{}, error) {
-			return &MyPoolObject{}, nil
-		}))
-	obj, _ := p.BorrowObject()
-	p.ReturnObject(obj)
+	t.Parallel()
+
+	ctx := context.Background()
+	p := NewObjectPoolWithDefaultConfig(
+		ctx,
+		NewPooledObjectFactorySimple(
+			func(context.Context) (interface{}, error) {
+				return &MyPoolObject{}, nil
+			}))
+	obj, _ := p.BorrowObject(ctx)
+	p.ReturnObject(ctx, obj)
 }
 
 type MyObjectFactory struct {
 }
 
-func (f *MyObjectFactory) MakeObject() (*PooledObject, error) {
+func (f *MyObjectFactory) MakeObject(ctx context.Context) (*PooledObject, error) {
 	return NewPooledObject(&MyPoolObject{}), nil
 }
 
-func (f *MyObjectFactory) DestroyObject(object *PooledObject) error {
+func (f *MyObjectFactory) DestroyObject(ctx context.Context, object *PooledObject) error {
 	//do destroy
 	return nil
 }
 
-func (f *MyObjectFactory) ValidateObject(object *PooledObject) bool {
+func (f *MyObjectFactory) ValidateObject(ctx context.Context, object *PooledObject) bool {
 	//do validate
 	return true
 }
 
-func (f *MyObjectFactory) ActivateObject(object *PooledObject) error {
+func (f *MyObjectFactory) ActivateObject(ctx context.Context, object *PooledObject) error {
 	//do activate
 	return nil
 }
 
-func (f *MyObjectFactory) PassivateObject(object *PooledObject) error {
+func (f *MyObjectFactory) PassivateObject(ctx context.Context, object *PooledObject) error {
 	//do passivate
 	return nil
 }
 
 func TestCustomFactoryExample(t *testing.T) {
-	p := NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
-	obj, _ := p.BorrowObject()
-	p.ReturnObject(obj)
+	t.Parallel()
+
+	ctx := context.Background()
+	p := NewObjectPoolWithDefaultConfig(ctx, new(MyObjectFactory))
+	obj, _ := p.BorrowObject(ctx)
+	p.ReturnObject(ctx, obj)
 }
 
 func TestStringExample(t *testing.T) {
-	p := NewObjectPoolWithDefaultConfig(NewPooledObjectFactorySimple(
-		func() (interface{}, error) {
+	t.Parallel()
+
+	ctx := context.Background()
+	p := NewObjectPoolWithDefaultConfig(ctx, NewPooledObjectFactorySimple(
+		func(context.Context) (interface{}, error) {
 			var stringPointer = new(string)
 			*stringPointer = "hello"
 			return stringPointer, nil
 		}))
-	obj, _ := p.BorrowObject()
+	obj, _ := p.BorrowObject(ctx)
 	fmt.Println(obj)
 	assert.Equal(t, "hello", *obj.(*string))
-	p.ReturnObject(obj)
+	p.ReturnObject(ctx, obj)
 }
 
 //func TestStringExampleFail(t *testing.T) {
@@ -69,7 +82,7 @@ func TestStringExample(t *testing.T) {
 //		func() (interface{}, error) {
 //			return "hello", nil
 //		}))
-//	obj, _ := p.BorrowObject()
+//	obj, _ := p.BorrowObject(ctx)
 //	p.ReturnObject(obj)
 //}
 //
@@ -78,6 +91,6 @@ func TestStringExample(t *testing.T) {
 //		func() (interface{}, error) {
 //			return 1, nil
 //		}))
-//	obj, _ := p.BorrowObject()
+//	obj, _ := p.BorrowObject(ctx)
 //	p.ReturnObject(obj)
 //}
