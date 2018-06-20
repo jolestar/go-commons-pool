@@ -9,8 +9,8 @@ import (
 type PooledObjectFactory interface {
 
 	/**
-	 * Create an instance that can be served by the pool and wrap it in a
-	 * PooledObject to be managed by the pool.
+	 * Create a pointer to an instance that can be served by the
+	 * pool and wrap it in a PooledObject to be managed by the pool.
 	 *
 	 * return error if there is a problem creating a new instance,
 	 *    this will be propagated to the code requesting an object.

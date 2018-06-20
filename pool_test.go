@@ -2030,6 +2030,16 @@ func (suit *PoolTestSuite) TestPreparePool() {
 	suit.Equal(1, suit.pool.GetNumIdle())
 }
 
+func (suit *PoolTestSuite) TestValueFactory() {
+	suit.pool.factory = NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
+		return "string value", nil
+	})
+
+	suit.Panics(func() {
+		suit.pool.BorrowObject(context.Background())
+	})
+}
+
 var perf bool
 
 func init() {
