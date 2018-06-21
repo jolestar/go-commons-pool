@@ -1845,7 +1845,6 @@ func (suit *PoolTestSuite) TestInvalidateFreesCapacity() {
 *
  */
 func (suit *PoolTestSuite) TestValidationFailureOnReturnFreesCapacity() {
-	ctx := context.Background()
 	suit.factory.setValid(false) // Validate will always fail
 	suit.factory.enableValidation = true
 	suit.pool.Config.MaxTotal = 2
@@ -2028,6 +2027,16 @@ func (suit *PoolTestSuite) TestPreparePool() {
 	suit.NoError(suit.pool.ReturnObject(ctx, obj))
 	suit.pool.PreparePool(ctx)
 	suit.Equal(1, suit.pool.GetNumIdle())
+}
+
+func (suit *PoolTestSuite) TestValueFactory() {
+	suit.pool.factory = NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
+		return "string value", nil
+	})
+
+	suit.Panics(func() {
+		suit.pool.BorrowObject(context.Background())
+	})
 }
 
 var perf bool

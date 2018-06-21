@@ -3,21 +3,22 @@ Go Commons Pool
 
 [![Build Status](https://travis-ci.org/jolestar/go-commons-pool.svg?branch=master)](https://travis-ci.org/jolestar/go-commons-pool)
 [![CodeCov](https://codecov.io/gh/jolestar/go-commons-pool/branch/master/graph/badge.svg)](https://codecov.io/gh/jolestar/go-commons-pool)
-[![GoDoc](http://godoc.org/github.com/jolestar/go-commons-pool?status.svg)](http://godoc.org/github.com/jolestar/go-commons-pool)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jolestar/go-commons-pool)](https://goreportcard.com/report/github.com/jolestar/go-commons-pool)
+[![GoDoc](https://godoc.org/github.com/jolestar/go-commons-pool?status.svg)](https://godoc.org/github.com/jolestar/go-commons-pool)
 
-The Go Commons Pool is a generic object pool for [Golang](http://golang.org/), direct rewrite from [Apache Commons Pool](https://commons.apache.org/proper/commons-pool/).
-
+The Go Commons Pool is a generic object pool for [Golang](https://golang.org/), direct rewrite from [Apache Commons Pool](https://commons.apache.org/proper/commons-pool/).
 
 Features
 -------
+
 1. Support custom [PooledObjectFactory](https://godoc.org/github.com/jolestar/go-commons-pool#PooledObjectFactory).
-1. Rich pool configuration option, can precise control pooled object lifecycle. see [ObjectPoolConfig](https://godoc.org/github.com/jolestar/go-commons-pool#ObjectPoolConfig).
-	* Pool LIFO (last in, first out) or FIFO (first in, first out) 
-	* Pool cap config
-	* Pool object validate config
-	* Pool object borrow block and max waiting time config
-	* Pool object eviction config
-	* Pool object abandon config
+1. Rich pool configuration option, can precise control pooled object lifecycle. See [ObjectPoolConfig](https://godoc.org/github.com/jolestar/go-commons-pool#ObjectPoolConfig).
+    * Pool LIFO (last in, first out) or FIFO (first in, first out)
+    * Pool cap config
+    * Pool object validate config
+    * Pool object borrow block and max waiting time config
+    * Pool object eviction config
+    * Pool object abandon config
 
 Pool Configuration Option
 -------
@@ -42,87 +43,97 @@ Configuration option table, more detail description see [ObjectPoolConfig](https
 
 Usage
 -------
-    import "github.com/jolestar/go-commons-pool"
 
-    //use create func
-    p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
-    		func() (interface{}, error) {
-    			return &MyPoolObject{}, nil
-    		}))
-    obj, _ := p.BorrowObject()
-    p.ReturnObject(obj)
-    	
-    //use custom Object factory
-    
-    type MyObjectFactory struct {
-    }
-    
-    func (f *MyObjectFactory) MakeObject() (*pool.PooledObject, error) {
-    	return pool.NewPooledObject(&MyPoolObject{}), nil
-    }
-    
-    func (f *MyObjectFactory) DestroyObject(object *PooledObject) error {
-    	//do destroy
-    	return nil
-    }
-    
-    func (f *MyObjectFactory) ValidateObject(object *pool.PooledObject) bool {
-    	//do validate
-    	return true
-    }
-    
-    func (f *MyObjectFactory) ActivateObject(object *pool.PooledObject) error {
-    	//do activate
-    	return nil
-    }
-    
-    func (f *MyObjectFactory) PassivateObject(object *pool.PooledObject) error {
-    	//do passivate
-    	return nil
-    }
-    
-    p := pool.NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
-    p.Config.MaxTotal = 100
-    obj, _ := p.BorrowObject()
-    p.ReturnObject(obj)
+```golang
+import "github.com/jolestar/go-commons-pool"
 
-more example please see pool_test.go and example_test.go
+//use create func
+p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
+        func() (interface{}, error) {
+            return &MyPoolObject{}, nil
+        }))
+obj, _ := p.BorrowObject()
+p.ReturnObject(obj)
+
+//use custom Object factory
+
+type MyObjectFactory struct {
+}
+
+func (f *MyObjectFactory) MakeObject() (*pool.PooledObject, error) {
+    return pool.NewPooledObject(&MyPoolObject{}), nil
+}
+
+func (f *MyObjectFactory) DestroyObject(object *PooledObject) error {
+    //do destroy
+    return nil
+}
+
+func (f *MyObjectFactory) ValidateObject(object *pool.PooledObject) bool {
+    //do validate
+    return true
+}
+
+func (f *MyObjectFactory) ActivateObject(object *pool.PooledObject) error {
+    //do activate
+    return nil
+}
+
+func (f *MyObjectFactory) PassivateObject(object *pool.PooledObject) error {
+    //do passivate
+    return nil
+}
+
+p := pool.NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
+p.Config.MaxTotal = 100
+obj, _ := p.BorrowObject()
+p.ReturnObject(obj)
+```
+
+For more examples please see `pool_test.go` and `example_test.go`.
 
 Note
 -------
-PooledObjectFactory.MakeObject must return a pointer, not value.
-The following code will complain error. 
 
-	p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
-		func() (interface{}, error) {
-			return "hello", nil
-		}))
-	obj, _ := p.BorrowObject()
-	p.ReturnObject(obj)
+PooledObjectFactory.MakeObject must return a pointer, not value.
+The following code will complain error.
+
+```golang
+p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
+    func() (interface{}, error) {
+        return "hello", nil
+    }))
+obj, _ := p.BorrowObject()
+p.ReturnObject(obj)
+```
 
 The right way is:
 
-	p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
-		func() (interface{}, error) {
-			var stringPointer = new(string)
-			*stringPointer = "hello"
-			return stringPointer, nil
-		}))
+```golang
+p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
+    func() (interface{}, error) {
+        s := "hello"
+        return &s, nil
+    }))
+```
 
-more example please see example_test.go
+For more examples please see `example_test.go`.
 
 Dependency
 -------
+
 * [testify](https://github.com/stretchr/testify) for test
 
 PerformanceTest
 -------
+
 The results of running the pool_perf_test is almost equal to the java version [PerformanceTest](https://github.com/apache/commons-pool/blob/trunk/src/test/java/org/apache/commons/pool2/performance/PerformanceTest.java)
-    
+
     go test --perf=true
 
 For Apache commons pool user
 -------
+
 * Direct use pool.Config.xxx to change pool config
 * Default config value is same as java version
 * If TimeBetweenEvictionRuns changed after ObjectPool created, should call  **ObjectPool.StartEvictor** to take effect. Java version do this on set method.
@@ -132,10 +143,12 @@ For Apache commons pool user
 
 FAQ
 -------
+
 [FAQ](https://github.com/jolestar/go-commons-pool/wiki/FAQ)
 
 How to contribute
 -------
+
 * Choose one open issue you want to solve, if not create one and describe what you want to change.
 * Fork the repository on GitHub.
 * Write code to solve the issue.
@@ -145,11 +158,11 @@ How to contribute
 
 中文文档
 -------
+
 * [Go Commons Pool发布以及Golang多线程编程问题总结](http://jolestar.com/go-commons-pool-and-go-concurrent/)
 * [Go Commons Pool 1.0 发布](http://jolestar.com/go-commons-pool-v1-release/)
-
 
 License
 -------
 
-Go Commons Pool is available under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+Go Commons Pool is available under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.html).

@@ -42,9 +42,10 @@ type TrackedUse interface {
 	GetLastUsed() time.Time
 }
 
-// PooledObject is the wrapper of origin object that is used to track the additional information, such as
-// state, for the pooled objects.
+// PooledObject is the wrapper of origin object that is used to track the additional information,
+// such as state, for the pooled objects.
 type PooledObject struct {
+	// Object must be a pointer
 	Object         interface{}
 	CreateTime     time.Time
 	LastBorrowTime time.Time

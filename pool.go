@@ -131,6 +131,9 @@ func (pool *ObjectPool) addIdleObject(ctx context.Context, p *PooledObject) erro
 // idle object and have been activated with
 // PooledObjectFactory.ActivateObject and then validated with
 // PooledObjectFactory.ValidateObject.
+// If the pool is full (based on the number of objects in the pool and the
+// value of the MaxTotal configuration field), this method will block until
+// an object is returned to the pool or the context is cancelled.
 //
 // By contract, clients must return the borrowed instance
 // using ReturnObject, InvalidateObject
