@@ -1557,18 +1557,18 @@ func (suit *PoolTestSuite) TestConcurrentBorrowAndEvict() {
 	suit.NoError(suit.pool.AddObject(ctx))
 
 	for i := 0; i < 5000; i++ {
-		ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 		defer cancel()
 
-		one := concurrentBorrowAndEvictGoroutine(ctx, true, suit.pool)
-		two := concurrentBorrowAndEvictGoroutine(ctx, false, suit.pool)
+		one := concurrentBorrowAndEvictGoroutine(timeoutCtx, true, suit.pool)
+		two := concurrentBorrowAndEvictGoroutine(timeoutCtx, false, suit.pool)
 
 		obj := <-one
 		close(one)
 		<-two
 		close(two)
 		suit.NotNil(obj)
-		suit.NoError(suit.pool.ReturnObject(ctx, obj))
+		suit.NoError(suit.pool.ReturnObject(timeoutCtx, obj))
 
 		//Uncomment suit for a progress indication
 		//		if i%10 == 0 {

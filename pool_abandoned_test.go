@@ -55,8 +55,7 @@ func TestAbandonedTestObject(t *testing.T) {
 	t.Parallel()
 
 	obj := NewAbandonedTestObject()
-	var trackedUse TrackedUse
-	trackedUse = obj
+	trackedUse := TrackedUse(obj)
 	assert.Zero(t, trackedUse.GetLastUsed())
 }
 
