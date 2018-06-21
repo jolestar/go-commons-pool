@@ -293,11 +293,11 @@ func (suit *PoolTestSuite) TestBaseAddObject() {
 	suit.assertEquals(0, suit.pool.GetNumActive())
 }
 
-func (suit *PoolTestSuite) isLifo() bool {
+func (suit *PoolTestSuite) isLIFO() bool {
 	return true
 }
 
-func (suit *PoolTestSuite) isFifo() bool {
+func (suit *PoolTestSuite) isFIFO() bool {
 	return false
 }
 
@@ -324,18 +324,18 @@ func (suit *PoolTestSuite) TestBaseBorrowReturn() {
 	suit.pool.ReturnObject(ctx, obj0)
 	suit.pool.ReturnObject(ctx, obj2)
 	obj2 = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
-	if suit.isLifo() {
+	if suit.isLIFO() {
 		suit.assertEquals(getNthObject(2), obj2)
 	}
-	if suit.isFifo() {
+	if suit.isFIFO() {
 		suit.assertEquals(getNthObject(0), obj2)
 	}
 
 	obj0 = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx))
-	if suit.isLifo() {
+	if suit.isLIFO() {
 		suit.assertEquals(getNthObject(0), obj0)
 	}
-	if suit.isFifo() {
+	if suit.isFIFO() {
 		suit.assertEquals(getNthObject(2), obj0)
 	}
 }
@@ -695,7 +695,7 @@ func (suit *PoolTestSuite) checkEvict(ctx context.Context, lifo bool) {
 	suit.pool.Config.SoftMinEvictableIdleTime = 10 * time.Millisecond
 	suit.pool.Config.MinIdle = 2
 	suit.pool.Config.TestWhileIdle = true
-	suit.pool.Config.Lifo = lifo
+	suit.pool.Config.LIFO = lifo
 	Prefill(ctx, suit.pool, 5)
 	suit.pool.evict(ctx)
 	idle = suit.pool.GetNumIdle()
@@ -748,7 +748,7 @@ func (suit *PoolTestSuite) checkEvictionOrder(ctx context.Context, lifo bool) {
 func (suit *PoolTestSuite) checkEvictionOrderPart1(ctx context.Context, lifo bool) {
 	suit.pool.Config.NumTestsPerEvictionRun = 2
 	suit.pool.Config.MinEvictableIdleTime = 100 * time.Millisecond
-	suit.pool.Config.Lifo = lifo
+	suit.pool.Config.LIFO = lifo
 	for i := 0; i < 5; i++ {
 		suit.pool.AddObject(ctx)
 		time.Sleep(time.Duration(100) * time.Millisecond)
@@ -772,7 +772,7 @@ func (suit *PoolTestSuite) checkEvictionOrderPart2(ctx context.Context, lifo boo
 	// Two eviction runs in sequence
 	suit.pool.Config.NumTestsPerEvictionRun = 2
 	suit.pool.Config.MinEvictableIdleTime = 100 * time.Millisecond
-	suit.pool.Config.Lifo = lifo
+	suit.pool.Config.LIFO = lifo
 	for i := 0; i < 5; i++ {
 		suit.pool.AddObject(ctx)
 		time.Sleep(time.Duration(100) * time.Millisecond)
@@ -1643,7 +1643,7 @@ func waitTestGoroutine(ctx context.Context, pool *ObjectPool, pause time.Duratio
 
 func (suit *PoolTestSuite) TestFIFO() {
 	ctx := context.Background()
-	suit.pool.Config.Lifo = false
+	suit.pool.Config.LIFO = false
 	suit.NoError(suit.pool.AddObject(ctx)) // "0"
 	suit.NoError(suit.pool.AddObject(ctx)) // "1"
 	suit.NoError(suit.pool.AddObject(ctx)) // "2"
@@ -1659,7 +1659,7 @@ func (suit *PoolTestSuite) TestFIFO() {
 
 func (suit *PoolTestSuite) TestLIFO() {
 	ctx := context.Background()
-	suit.pool.Config.Lifo = true
+	suit.pool.Config.LIFO = true
 	suit.NoError(suit.pool.AddObject(ctx)) // "0"
 	suit.NoError(suit.pool.AddObject(ctx)) // "1"
 	suit.NoError(suit.pool.AddObject(ctx)) // "2"

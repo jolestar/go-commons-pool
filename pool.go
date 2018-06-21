@@ -111,7 +111,7 @@ func (pool *ObjectPool) addIdleObject(ctx context.Context, p *PooledObject) erro
 			return err
 		}
 
-		if pool.Config.Lifo {
+		if pool.Config.LIFO {
 			err = pool.idleObjects.AddFirst(p)
 		} else {
 			err = pool.idleObjects.AddLast(p)
@@ -348,7 +348,7 @@ func (pool *ObjectPool) ensureIdle(ctx context.Context, idleCount int, always bo
 			// create will work. Give up.
 			break
 		}
-		if pool.Config.Lifo {
+		if pool.Config.LIFO {
 			pool.idleObjects.AddFirst(p)
 		} else {
 			pool.idleObjects.AddLast(p)
@@ -427,7 +427,7 @@ func (pool *ObjectPool) ReturnObject(ctx context.Context, object interface{}) er
 	if pool.IsClosed() || maxIdleSave > -1 && maxIdleSave <= pool.idleObjects.Size() {
 		pool.destroy(ctx, p)
 	} else {
-		if pool.Config.Lifo {
+		if pool.Config.LIFO {
 			pool.idleObjects.AddFirst(p)
 		} else {
 			pool.idleObjects.AddLast(p)
@@ -559,7 +559,7 @@ func (pool *ObjectPool) getNumTests() int {
 
 // idleIterator return pool idleObjects iterator
 func (pool *ObjectPool) idleIterator() collections.Iterator {
-	if pool.Config.Lifo {
+	if pool.Config.LIFO {
 		return pool.idleObjects.DescendingIterator()
 	}
 	return pool.idleObjects.Iterator()

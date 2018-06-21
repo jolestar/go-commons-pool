@@ -15,8 +15,8 @@ const (
 	DefaultMaxIdle = 8
 	// DefaultMinIdle is the default value of ObjectPoolConfig.MinIdle
 	DefaultMinIdle = 0
-	// DefaultLifo is the default value of ObjectPoolConfig.Lifo
-	DefaultLifo = true
+	// DefaultLIFO is the default value of ObjectPoolConfig.LIFO
+	DefaultLIFO = true
 
 	// TODO
 	// DEFAULT_FAIRNESS = false
@@ -51,7 +51,7 @@ type ObjectPoolConfig struct {
 	 * from the pool, or as a FIFO (first in, first out) queue, where the pool
 	 * always returns the oldest object in the idle object pool.
 	 */
-	Lifo bool
+	LIFO bool
 
 	/**
 	 * The cap on the number of objects that can be allocated by the pool
@@ -191,7 +191,7 @@ type ObjectPoolConfig struct {
 // NewDefaultPoolConfig return a ObjectPoolConfig instance init with default value.
 func NewDefaultPoolConfig() *ObjectPoolConfig {
 	return &ObjectPoolConfig{
-		Lifo:                     DefaultLifo,
+		LIFO:                     DefaultLIFO,
 		MaxTotal:                 DefaultMaxTotal,
 		MaxIdle:                  DefaultMaxIdle,
 		MinIdle:                  DefaultMinIdle,
