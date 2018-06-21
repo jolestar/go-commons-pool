@@ -1845,7 +1845,6 @@ func (suit *PoolTestSuite) TestInvalidateFreesCapacity() {
 *
  */
 func (suit *PoolTestSuite) TestValidationFailureOnReturnFreesCapacity() {
-	ctx := context.Background()
 	suit.factory.setValid(false) // Validate will always fail
 	suit.factory.enableValidation = true
 	suit.pool.Config.MaxTotal = 2
