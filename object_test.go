@@ -32,8 +32,7 @@ func TestTrackedUse(t *testing.T) {
 
 	now := time.Now()
 	object := &TrackedUseObject{lastUsed: now}
-	var trackedUse TrackedUse
-	trackedUse = object
+	trackedUse := TrackedUse(object)
 	assert.Equal(t, now, trackedUse.GetLastUsed())
 
 	pooledObject := NewPooledObject(object)

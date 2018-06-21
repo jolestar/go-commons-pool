@@ -27,7 +27,7 @@ Configuration option table, more detail description see [ObjectPoolConfig](https
 
 | Option                        | Default        | Description  |
 | ------------------------------|:--------------:| :------------|
-| Lifo                          | true           |If pool is LIFO (last in, first out)|
+| LIFO                          | true           |If pool is LIFO (last in, first out)|
 | MaxTotal                      | 8              |The cap of pool|
 | MaxIdle                       | 8              |Max "idle" instances in the pool |
 | MinIdle                       | 0              |Min "idle" instances in the pool |

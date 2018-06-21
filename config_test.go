@@ -30,7 +30,7 @@ func TestDefaultConfig(t *testing.T) {
 	config := NewDefaultPoolConfig()
 	assert.Equal(t, DefaultBlockWhenExhausted, config.BlockWhenExhausted)
 	assert.Equal(t, DefaultEvictionPolicyName, config.EvictionPolicyName)
-	assert.Equal(t, DefaultLifo, config.Lifo)
+	assert.Equal(t, DefaultLIFO, config.LIFO)
 	assert.Equal(t, DefaultMaxIdle, config.MaxIdle)
 	assert.Equal(t, DefaultMaxTotal, config.MaxTotal)
 	assert.Equal(t, DefaultMinEvictableIdleTime, config.MinEvictableIdleTime)
