@@ -41,7 +41,7 @@ func TestDefaultPooledObjectFactory(t *testing.T) {
 			return &TestFactoryObject{status: "make"}, nil
 		},
 		func(ctx context.Context, object *PooledObject) error {
-			object.Object.(*TestFactoryObject).status = "destory"
+			object.Object.(*TestFactoryObject).status = "destroy"
 			return nil
 		},
 		func(ctx context.Context, object *PooledObject) bool {
@@ -71,5 +71,5 @@ func TestDefaultPooledObjectFactory(t *testing.T) {
 	assert.True(t, factory.ValidateObject(ctx, o))
 	assert.Equal(t, "validate", obj.status)
 	assert.Nil(t, factory.DestroyObject(ctx, o))
-	assert.Equal(t, "destory", obj.status)
+	assert.Equal(t, "destroy", obj.status)
 }
