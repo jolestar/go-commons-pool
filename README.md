@@ -33,14 +33,12 @@ Configuration option table, more detail description see [ObjectPoolConfig](https
 | TestOnCreate                  | false          |Validate when object is created|
 | TestOnBorrow                  | false          |Validate when object is borrowed|
 | TestOnReturn                  | false          |Validate when object is returned|
-| TestWhileIdle                 | false          |Validate when object is idle, see TimeBetweenEvictionRunsMillis |
+| TestWhileIdle                 | false          |Validate when object is idle, see TimeBetweenEvictionRuns |
 | BlockWhenExhausted            | true           |Whether to block when the pool is exhausted  |
-| MaxWaitMillis                 | -1             |Max block time, less than 0 mean indefinitely|
-| MinEvictableIdleTimeMillis    | 1000 * 60 * 30 |Eviction configuration,see DefaultEvictionPolicy |
-| SoftMinEvictableIdleTimeMillis| math.MaxInt64  |Eviction configuration,see DefaultEvictionPolicy  |
+| MinEvictableIdleTime          | 30m            |Eviction configuration,see DefaultEvictionPolicy |
+| SoftMinEvictableIdleTime      | math.MaxInt64  |Eviction configuration,see DefaultEvictionPolicy  |
 | NumTestsPerEvictionRun        | 3              |The maximum number of objects to examine during each run evictor goroutine |
-| TimeBetweenEvictionRunsMillis | -1             |The number of milliseconds to sleep between runs of the evictor goroutine, less than 0 mean not run |
-
+| TimeBetweenEvictionRuns       | 0              |The number of milliseconds to sleep between runs of the evictor goroutine, less than 1 mean not run |
 
 Usage
 -------
@@ -127,7 +125,7 @@ For Apache commons pool user
 -------
 * Direct use pool.Config.xxx to change pool config
 * Default config value is same as java version
-* If TimeBetweenEvictionRunsMillis changed after ObjectPool created, should call  **ObjectPool.StartEvictor** to take effect. Java version do this on set method.
+* If TimeBetweenEvictionRuns changed after ObjectPool created, should call  **ObjectPool.StartEvictor** to take effect. Java version do this on set method.
 * No KeyedObjectPool (TODO)
 * No ProxiedObjectPool
 * No pool stats (TODO)

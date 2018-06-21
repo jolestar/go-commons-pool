@@ -1,9 +1,10 @@
 package collections
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type HashableObject struct {
@@ -21,6 +22,8 @@ type UnhashableObject struct {
 }
 
 func TestSyncMapString(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	key := "key"
 	//var key *interface{}
@@ -32,6 +35,8 @@ func TestSyncMapString(t *testing.T) {
 }
 
 func TestSyncMapValues(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	key := "key"
 	key2 := "key2"
@@ -42,6 +47,8 @@ func TestSyncMapValues(t *testing.T) {
 }
 
 func TestSyncMapHashableObject(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	o1 := HashableObject{}
 	m.Put(&o1, "value1")
@@ -53,6 +60,8 @@ func TestSyncMapHashableObject(t *testing.T) {
 }
 
 func TestSyncMapHashableObject2(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	o1 := HashableObject{}
 	m.Put(&o1, "value1")
@@ -63,6 +72,8 @@ func TestSyncMapHashableObject2(t *testing.T) {
 }
 
 func TestSyncMapHashableObject3(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	o1 := HashableObject{}
 	m.Put(&o1, &o1)
@@ -71,6 +82,8 @@ func TestSyncMapHashableObject3(t *testing.T) {
 }
 
 func TestSyncMapUnhashableObject(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	o1 := UnhashableObject{}
 	m.Put(&o1, "value1")
@@ -82,6 +95,8 @@ func TestSyncMapUnhashableObject(t *testing.T) {
 }
 
 func TestMultiThread(t *testing.T) {
+	t.Parallel()
+
 	m := NewSyncMap()
 	wait := sync.WaitGroup{}
 	wait.Add(1000)

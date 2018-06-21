@@ -2,9 +2,10 @@ package pool
 
 import (
 	"fmt"
-	"github.com/jolestar/go-commons-pool/collections"
 	"sync"
 	"time"
+
+	"github.com/jolestar/go-commons-pool/collections"
 )
 
 // PooledObjectState is PooledObjectState enum const
@@ -38,18 +39,18 @@ const (
 // object has been abandoned.
 type TrackedUse interface {
 	// GetLastUsed Get the last time o object was used in ms.
-	GetLastUsed() int64
+	GetLastUsed() time.Time
 }
 
 // PooledObject is the wrapper of origin object that is used to track the additional information, such as
 // state, for the pooled objects.
 type PooledObject struct {
 	Object         interface{}
-	CreateTime     int64
-	LastBorrowTime int64
-	LastReturnTime int64
+	CreateTime     time.Time
+	LastBorrowTime time.Time
+	LastReturnTime time.Time
 	//init equals CreateTime
-	LastUseTime   int64
+	LastUseTime   time.Time
 	state         PooledObjectState
 	BorrowedCount int32
 	lock          sync.Mutex
@@ -57,32 +58,27 @@ type PooledObject struct {
 
 // NewPooledObject return new init PooledObject
 func NewPooledObject(object interface{}) *PooledObject {
-	time := currentTimeMillis()
+	time := time.Now()
 	return &PooledObject{Object: object, state: StateIdle, CreateTime: time, LastUseTime: time, LastBorrowTime: time, LastReturnTime: time}
 }
 
-func currentTimeMillis() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
-}
-
-// GetActiveTimeMillis return the time in milliseconds that this object last spent in the the active state
-func (o *PooledObject) GetActiveTimeMillis() int64 {
+// GetActiveTime return the time that this object last spent in the the active state
+func (o *PooledObject) GetActiveTime() time.Duration {
 	// Take copies to avoid concurrent issues
 	rTime := o.LastReturnTime
 	bTime := o.LastBorrowTime
 
-	if rTime > bTime {
-		return rTime - bTime
+	if rTime.After(bTime) {
+		return rTime.Sub(bTime)
 	}
-	return currentTimeMillis() - bTime
+	return time.Since(bTime)
 }
 
-// GetIdleTimeMillis the time in milliseconds that this object last spend in the the idle state
-func (o *PooledObject) GetIdleTimeMillis() int64 {
-	elapsed := currentTimeMillis() - o.LastReturnTime
+// GetIdleTime the time that this object last spend in the the idle state
+func (o *PooledObject) GetIdleTime() time.Duration {
+	elapsed := time.Since(o.LastReturnTime)
 	// elapsed may be negative if:
 	// - another goroutine updates lastReturnTime during the calculation window
-	// - currentTimeMillis() is not monotonic (e.g. system time is set back)
 	if elapsed >= 0 {
 		return elapsed
 	}
@@ -90,13 +86,10 @@ func (o *PooledObject) GetIdleTimeMillis() int64 {
 }
 
 // GetLastUsedTime return an estimate of the last time this object was used.
-func (o *PooledObject) GetLastUsedTime() int64 {
+func (o *PooledObject) GetLastUsedTime() time.Time {
 	trackedUse, ok := o.Object.(TrackedUse)
-	if ok {
-		if trackedUse.GetLastUsed() > o.LastUseTime {
-			return trackedUse.GetLastUsed()
-		}
-		return o.LastUseTime
+	if ok && trackedUse.GetLastUsed().After(o.LastUseTime) {
+		return trackedUse.GetLastUsed()
 	}
 	return o.LastUseTime
 }
@@ -104,7 +97,7 @@ func (o *PooledObject) GetLastUsedTime() int64 {
 func (o *PooledObject) doAllocate() bool {
 	if o.state == StateIdle {
 		o.state = StateAllocated
-		o.LastBorrowTime = currentTimeMillis()
+		o.LastBorrowTime = time.Now()
 		o.LastUseTime = o.LastBorrowTime
 		o.BorrowedCount++
 		//if (logAbandoned) {
@@ -133,7 +126,7 @@ func (o *PooledObject) doDeallocate() bool {
 	if o.state == StateAllocated ||
 		o.state == StateReturning {
 		o.state = StateIdle
-		o.LastReturnTime = currentTimeMillis()
+		o.LastReturnTime = time.Now()
 		//borrowedBy = nil;
 		return true
 	}

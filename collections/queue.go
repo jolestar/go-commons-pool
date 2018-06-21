@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/jolestar/go-commons-pool/concurrent"
 )
@@ -292,16 +291,6 @@ func (q *LinkedBlockingDeque) PollFirstWithContext(ctx context.Context) (interfa
 	return x, nil
 }
 
-// PollFirstWithTimeout retrieves and removes the first element of this deque, waiting
-// up to the specified wait time if necessary for an element to become available.
-// return NewInterruptedErr when waiting bean interrupted
-func (q *LinkedBlockingDeque) PollFirstWithTimeout(timeout time.Duration) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return q.PollFirstWithContext(ctx)
-}
-
 // PollLast retrieves and removes the last element of this deque,
 // or returns nil if this deque is empty.
 func (q *LinkedBlockingDeque) PollLast() interface{} {
@@ -331,16 +320,6 @@ func (q *LinkedBlockingDeque) PollLastWithContext(ctx context.Context) (interfac
 		interrupt = q.notEmpty.Wait(ctx)
 	}
 	return x, nil
-}
-
-// PollLastWithTimeout retrieves and removes the last element of this deque, waiting
-// up to the specified wait time if necessary for an element to become available.
-// return NewInterruptedErr when waiting bean interrupted
-func (q *LinkedBlockingDeque) PollLastWithTimeout(timeout time.Duration) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return q.PollLastWithContext(ctx)
 }
 
 // TakeFirst unlink the first element in the queue, waiting until there is an element

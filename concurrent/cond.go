@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // TimeoutCond is a sync.Cond  improve for support wait timeout.
@@ -41,19 +40,6 @@ func (cond *TimeoutCond) removeWaiter() {
 // HasWaiters queries whether any goroutine are waiting on this condition
 func (cond *TimeoutCond) HasWaiters() bool {
 	return atomic.LoadUint64(&cond.hasWaiters) > 0
-}
-
-// WaitWithTimeout wait for signal return remain wait time, and is interrupted
-func (cond *TimeoutCond) WaitWithTimeout(timeout time.Duration) (time.Duration, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	begin := time.Now()
-	interrupted := cond.Wait(ctx)
-	elapsed := time.Since(begin)
-	remainingTimeout := timeout - elapsed
-
-	return remainingTimeout, interrupted
 }
 
 // Wait waits for a signal, or for the context do be done. Returns true if signaled.

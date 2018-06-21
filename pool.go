@@ -162,15 +162,13 @@ func (pool *ObjectPool) GetDestroyedByBorrowValidationCount() int {
 
 func (pool *ObjectPool) removeAbandoned(ctx context.Context, config *AbandonedConfig) {
 	// Generate a list of abandoned objects to remove
-	now := currentTimeMillis()
-	timeout := now - int64((config.RemoveAbandonedTimeout * 1000))
 	var remove []*PooledObject
 	objects := pool.allObjects.Values()
 	for _, o := range objects {
 		pooledObject := o.(*PooledObject)
 		pooledObject.lock.Lock()
 		if pooledObject.state == StateAllocated &&
-			pooledObject.GetLastUsedTime() <= timeout {
+			time.Since(pooledObject.GetLastUsedTime()) > config.RemoveAbandonedTimeout {
 			pooledObject.markAbandoned()
 			remove = append(remove, pooledObject)
 		}
@@ -227,11 +225,11 @@ func (pool *ObjectPool) doDestroy(ctx context.Context, toDestroy *PooledObject, 
 	pool.createCount.DecrementAndGet()
 }
 
-func (pool *ObjectPool) updateStatsBorrow(object *PooledObject, timeMillis int64) {
+func (pool *ObjectPool) updateStatsBorrow(object *PooledObject, time time.Duration) {
 	//TODO
 }
 
-func (pool *ObjectPool) updateStatsReturn(activeTime int64) {
+func (pool *ObjectPool) updateStatsReturn(activeTime time.Duration) {
 	//TODO
 	//returnedCount.incrementAndGet();
 	//activeTimes.add(activeTime);
@@ -255,7 +253,7 @@ func (pool *ObjectPool) borrowObject(ctx context.Context) (interface{}, error) {
 	blockWhenExhausted := pool.Config.BlockWhenExhausted
 
 	var create bool
-	waitTime := currentTimeMillis()
+	waitTime := time.Now()
 	var ok bool
 	for p == nil {
 		create = false
@@ -326,7 +324,7 @@ func (pool *ObjectPool) borrowObject(ctx context.Context) (interface{}, error) {
 		}
 	}
 
-	pool.updateStatsBorrow(p, currentTimeMillis()-waitTime)
+	pool.updateStatsBorrow(p, time.Since(waitTime))
 	return p.Object, nil
 }
 
@@ -396,7 +394,7 @@ func (pool *ObjectPool) ReturnObject(ctx context.Context, object interface{}) er
 	// because go lock is not recursive
 	p.markReturning() // Keep from being marked abandoned
 	p.lock.Unlock()
-	activeTime := p.GetActiveTimeMillis()
+	activeTime := p.GetActiveTime()
 
 	if pool.Config.TestOnReturn {
 		if !pool.factory.ValidateObject(ctx, p) {
@@ -500,13 +498,13 @@ func (pool *ObjectPool) Close(ctx context.Context) {
 	pool.idleObjects.InterruptTakeWaiters()
 }
 
-// StartEvictor start background evictor goroutine, pool.Config.TimeBetweenEvictionRunsMillis must a positive number.
-// if ObjectPool.Config.TimeBetweenEvictionRunsMillis change, should call pool method to let it to take effect.
+// StartEvictor start background evictor goroutine, pool.Config.TimeBetweenEvictionRuns must a positive number.
+// if ObjectPool.Config.TimeBetweenEvictionRuns change, should call pool method to let it to take effect.
 func (pool *ObjectPool) StartEvictor() {
-	pool.startEvictor(pool.Config.TimeBetweenEvictionRunsMillis)
+	pool.startEvictor(pool.Config.TimeBetweenEvictionRuns)
 }
 
-func (pool *ObjectPool) startEvictor(delay int64) {
+func (pool *ObjectPool) startEvictor(delay time.Duration) {
 	pool.evictionLock.Lock()
 	defer pool.evictionLock.Unlock()
 	if pool.evictor != nil {
@@ -518,7 +516,7 @@ func (pool *ObjectPool) startEvictor(delay int64) {
 		pool.evictionIterator = nil
 	}
 	if delay > 0 {
-		pool.evictor = time.NewTicker(time.Duration(delay) * time.Millisecond)
+		pool.evictor = time.NewTicker(delay)
 		pool.evictorStopChan = make(chan struct{})
 		pool.evictorStopWG = sync.WaitGroup{}
 		pool.evictorStopWG.Add(1)
@@ -587,8 +585,8 @@ func (pool *ObjectPool) evict(ctx context.Context) {
 	evictionPolicy := pool.getEvictionPolicy()
 
 	evictionConfig := EvictionConfig{
-		IdleEvictTime:     pool.Config.MinEvictableIdleTimeMillis,
-		IdleSoftEvictTime: pool.Config.SoftMinEvictableIdleTimeMillis,
+		IdleEvictTime:     pool.Config.MinEvictableIdleTime,
+		IdleSoftEvictTime: pool.Config.SoftMinEvictableIdleTime,
 		MinIdle:           pool.Config.MinIdle,
 		Context:           pool.Config.EvitionContext}
 
