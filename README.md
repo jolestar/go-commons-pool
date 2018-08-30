@@ -44,53 +44,123 @@ Configuration option table, more detail description see [ObjectPoolConfig](https
 Usage
 -------
 
-```golang
-import "github.com/jolestar/go-commons-pool"
+### Use Simple Factory
 
-//use create func
-p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
-        func() (interface{}, error) {
-            return &MyPoolObject{}, nil
-        }))
-obj, _ := p.BorrowObject()
-p.ReturnObject(obj)
+```go
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"sync/atomic"
 
-//use custom Object factory
+	"github.com/jolestar/go-commons-pool"
+)
 
-type MyObjectFactory struct {
+func Example_simple() {
+	type myPoolObject struct {
+		s string
+	}
+
+	v := uint64(0)
+	factory := pool.NewPooledObjectFactorySimple(
+		func(context.Context) (interface{}, error) {
+			return &myPoolObject{
+					s: strconv.FormatUint(atomic.AddUint64(&v, 1), 10),
+				},
+				nil
+		})
+
+	ctx := context.Background()
+	p := pool.NewObjectPoolWithDefaultConfig(ctx, factory)
+
+	obj, err := p.BorrowObject(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	o := obj.(*myPoolObject)
+	fmt.Println(o.s)
+
+	err = p.ReturnObject(ctx, obj)
+	if err != nil {
+		panic(err)
+	}
+
+	// Output: 1
 }
-
-func (f *MyObjectFactory) MakeObject() (*pool.PooledObject, error) {
-    return pool.NewPooledObject(&MyPoolObject{}), nil
-}
-
-func (f *MyObjectFactory) DestroyObject(object *PooledObject) error {
-    //do destroy
-    return nil
-}
-
-func (f *MyObjectFactory) ValidateObject(object *pool.PooledObject) bool {
-    //do validate
-    return true
-}
-
-func (f *MyObjectFactory) ActivateObject(object *pool.PooledObject) error {
-    //do activate
-    return nil
-}
-
-func (f *MyObjectFactory) PassivateObject(object *pool.PooledObject) error {
-    //do passivate
-    return nil
-}
-
-p := pool.NewObjectPoolWithDefaultConfig(new(MyObjectFactory))
-p.Config.MaxTotal = 100
-obj, _ := p.BorrowObject()
-p.ReturnObject(obj)
 ```
 
-For more examples please see `pool_test.go` and `example_test.go`.
+### Use Custom Factory
+
+```go
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"sync/atomic"
+
+	"github.com/jolestar/go-commons-pool"
+)
+
+type MyPoolObject struct {
+	s string
+}
+
+type MyCustomFactory struct {
+	v uint64
+}
+
+func (f *MyCustomFactory) MakeObject(ctx context.Context) (*pool.PooledObject, error) {
+	return pool.NewPooledObject(
+			&MyPoolObject{
+				s: strconv.FormatUint(atomic.AddUint64(&f.v, 1), 10),
+			}),
+		nil
+}
+
+func (f *MyCustomFactory) DestroyObject(ctx context.Context, object *pool.PooledObject) error {
+	// do destroy
+	return nil
+}
+
+func (f *MyCustomFactory) ValidateObject(ctx context.Context, object *pool.PooledObject) bool {
+	// do validate
+	return true
+}
+
+func (f *MyCustomFactory) ActivateObject(ctx context.Context, object *pool.PooledObject) error {
+	// do activate
+	return nil
+}
+
+func (f *MyCustomFactory) PassivateObject(ctx context.Context, object *pool.PooledObject) error {
+	// do passivate
+	return nil
+}
+
+func Example_customFactory() {
+	ctx := context.Background()
+	p := pool.NewObjectPoolWithDefaultConfig(ctx, &MyCustomFactory{})
+	p.Config.MaxTotal = 100
+    
+	obj1, err := p.BorrowObject(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	o := obj1.(*MyPoolObject)
+	fmt.Println(o.s)
+
+	err = p.ReturnObject(ctx, obj1)
+	if err != nil {
+		panic(err)
+	}
+
+	// Output: 1
+}
+```
+
+For more examples please see `pool_test.go` and `example_simple_test.go`, `example_customFactory_test.go`.
 
 Note
 -------
@@ -99,8 +169,8 @@ PooledObjectFactory.MakeObject must return a pointer, not value.
 The following code will complain error.
 
 ```golang
-p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
-    func() (interface{}, error) {
+p := pool.NewObjectPoolWithDefaultConfig(ctx, pool.NewPooledObjectFactorySimple(
+    func(context.Context) (interface{}, error) {
         return "hello", nil
     }))
 obj, _ := p.BorrowObject()
@@ -110,14 +180,14 @@ p.ReturnObject(obj)
 The right way is:
 
 ```golang
-p := pool.NewObjectPoolWithDefaultConfig(pool.NewPooledObjectFactorySimple(
-    func() (interface{}, error) {
+p := pool.NewObjectPoolWithDefaultConfig(ctx, pool.NewPooledObjectFactorySimple(
+    func(context.Context) (interface{}, error) {
         s := "hello"
         return &s, nil
     }))
 ```
 
-For more examples please see `example_test.go`.
+For more examples please see `example_simple_test.go`.
 
 Dependency
 -------
