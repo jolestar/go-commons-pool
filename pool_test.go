@@ -1317,6 +1317,37 @@ func (suit *PoolTestSuite) TestEvictionSoftMinIdle() {
 	suit.Equal(0, suit.pool.GetNumIdle(), "Idle count different than expected.")
 }
 
+
+func (suit *PoolTestSuite) TestEvictionNegativeIdleTime() {
+	suit.pool.Config.MaxIdle = 5
+	suit.pool.Config.MaxTotal = 5
+	suit.pool.Config.NumTestsPerEvictionRun = 5
+	// zero no negative mean's no evict.
+	suit.pool.Config.MinEvictableIdleTime = -1 * time.Second
+	suit.pool.Config.SoftMinEvictableIdleTime = -1 * time.Second
+	suit.pool.Config.MinIdle = 2
+
+	ctx := context.Background()
+	active := make([]*TestObject, 5)
+	for i := 0; i < 5; i++ {
+		active[i] = suit.NoErrorWithResult(suit.pool.BorrowObject(ctx)).(*TestObject)
+	}
+
+	for i := 0; i < 5; i++ {
+		suit.pool.ReturnObject(ctx, active[i])
+	}
+
+	// Soft evict
+	time.Sleep(time.Duration(1500) * time.Millisecond)
+	suit.pool.evict(ctx)
+	suit.Equal(5, suit.pool.GetNumIdle(), "Idle count different than expected.")
+
+	// Hard evict
+	time.Sleep(time.Duration(1600) * time.Millisecond)
+	suit.pool.evict(ctx)
+	suit.Equal(5, suit.pool.GetNumIdle(), "Idle count different than expected.")
+}
+
 func (suit *PoolTestSuite) TestEvictionInvalid() {
 	ctx := context.Background()
 	suit.pool = NewObjectPoolWithDefaultConfig(ctx, NewPooledObjectFactory(

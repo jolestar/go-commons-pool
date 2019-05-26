@@ -587,9 +587,18 @@ func (pool *ObjectPool) evict(ctx context.Context) {
 	var underTest *PooledObject
 	evictionPolicy := pool.getEvictionPolicy()
 
+	var idleEvictTime = time.Duration(math.MaxInt64)
+	if pool.Config.MinEvictableIdleTime > 0 {
+		idleEvictTime = pool.Config.MinEvictableIdleTime
+	}
+
+	var idleSoftEvictTime = time.Duration(math.MaxInt64)
+	if pool.Config.SoftMinEvictableIdleTime > 0 {
+		idleSoftEvictTime = pool.Config.SoftMinEvictableIdleTime;
+	}
 	evictionConfig := EvictionConfig{
-		IdleEvictTime:     pool.Config.MinEvictableIdleTime,
-		IdleSoftEvictTime: pool.Config.SoftMinEvictableIdleTime,
+		IdleEvictTime:     idleEvictTime,
+		IdleSoftEvictTime: idleSoftEvictTime,
 		MinIdle:           pool.Config.MinIdle,
 		Context:           pool.Config.EvitionContext}
 
