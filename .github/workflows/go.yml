@@ -1,5 +1,5 @@
 name: Go
-on: [push]
+on: [push, pull_request]
 jobs:
 
   build:
@@ -18,3 +18,7 @@ jobs:
 
     - name: Test
       run: ./test
+
+    - name: Sumbit code cov
+      if: success()
+      run: bash <(curl -s https://codecov.io/bash)
