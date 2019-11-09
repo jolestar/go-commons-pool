@@ -1,5 +1,15 @@
-name: Go
-on: [push, pull_request]
+name: Build
+on: 
+  push:
+    # only build master
+    branches: 
+      - master
+    paths-ignore:
+    - '**.md'
+  pull_request:
+    paths-ignore:
+    - '**.md'     
+        
 jobs:
 
   build:

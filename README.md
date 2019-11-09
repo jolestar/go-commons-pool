@@ -1,8 +1,7 @@
 Go Commons Pool
 =====
 
-[![Build Status](https://travis-ci.org/jolestar/go-commons-pool.svg?branch=master)](https://travis-ci.org/jolestar/go-commons-pool)
-[![Build Status](https://github.com/jolestar/go-commons-pool/workflows/Go/badge.svg)](https://github.com/jolestar/go-commons-pool/actions)
+[![Build Status](https://github.com/jolestar/go-commons-pool/workflows/Build/badge.svg)](https://github.com/jolestar/go-commons-pool/actions)
 [![CodeCov](https://codecov.io/gh/jolestar/go-commons-pool/branch/master/graph/badge.svg)](https://codecov.io/gh/jolestar/go-commons-pool)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jolestar/go-commons-pool)](https://goreportcard.com/report/github.com/jolestar/go-commons-pool)
 [![GoDoc](https://godoc.org/github.com/jolestar/go-commons-pool?status.svg)](https://godoc.org/github.com/jolestar/go-commons-pool)
