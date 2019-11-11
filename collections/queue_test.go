@@ -502,3 +502,21 @@ func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaiters() {
 	suit.Equal(1, val)
 	suit.False(suit.deque.HasTakeWaiters())
 }
+
+// https://github.com/jolestar/go-commons-pool/issues/44
+func (suit *LinkedBlockDequeTestSuite) TestDeadLock() {
+	ctx := context.Background()
+	suit.deque = NewDeque(1)
+	suit.deque.PutFirst(ctx, 1)
+	count := 1000000
+	testWG := sync.WaitGroup{}
+	testWG.Add(count)
+	for i := 0; i < count; i++ {
+		o := suit.NoErrorWithResult(suit.deque.PollFirstWithContext(ctx))
+		go func() {
+			suit.deque.PutFirst(ctx, o)
+			testWG.Done()
+		}()
+	}
+	testWG.Wait()
+}

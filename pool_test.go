@@ -1317,7 +1317,6 @@ func (suit *PoolTestSuite) TestEvictionSoftMinIdle() {
 	suit.Equal(0, suit.pool.GetNumIdle(), "Idle count different than expected.")
 }
 
-
 func (suit *PoolTestSuite) TestEvictionNegativeIdleTime() {
 	suit.pool.Config.MaxIdle = 5
 	suit.pool.Config.MaxTotal = 5
@@ -2068,6 +2067,32 @@ func (suit *PoolTestSuite) TestValueFactory() {
 	suit.Panics(func() {
 		suit.pool.BorrowObject(context.Background())
 	})
+}
+
+// https://github.com/jolestar/go-commons-pool/issues/44
+func (suit *PoolTestSuite) TestDeadLock() {
+	ctx := context.Background()
+	suit.pool.Config.MinIdle = 1
+	suit.pool.Config.MaxIdle = 1
+	suit.pool.Config.MaxTotal = 1
+	count := 1000000
+	testWG := sync.WaitGroup{}
+	testWG.Add(count)
+
+	for i := 0; i < count; i++ {
+		obj, err := suit.pool.BorrowObject(ctx)
+		if err != nil {
+			panic(err)
+		}
+		go func(obj interface{}) {
+			err = suit.pool.ReturnObject(ctx, obj)
+			if err != nil {
+				panic(err)
+			}
+			testWG.Done()
+		}(obj)
+	}
+	testWG.Wait()
 }
 
 var perf bool
