@@ -196,7 +196,7 @@ func TestInterrupted(t *testing.T) {
 	wait.Wait()
 	for i := 0; i < count; i++ {
 		b := <-ch
-		assert.True(t, b, "expect %v interrupted bug get false", i)
+		assert.True(t, b, "expect %v interrupted but get false", i)
 	}
 }
 
@@ -222,7 +222,7 @@ func TestInterruptedWithTimeout(t *testing.T) {
 	wait.Wait()
 	for i := 0; i < count; i++ {
 		b := <-ch
-		assert.True(t, b, "expect %v interrupted bug get false", i)
+		assert.True(t, b, "expect %v interrupted but get false", i)
 	}
 }
 

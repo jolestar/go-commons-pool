@@ -252,7 +252,7 @@ func (suit *LinkedBlockDequeTestSuite) TestInterrupt() {
 	for i := 0; i < 2; i++ {
 		_, e := suit.deque.TakeFirst(ctx)
 		_, ok := e.(*InterruptedErr)
-		suit.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
+		suit.True(ok, "expect InterruptedErr but get %v", reflect.TypeOf(e))
 		suit.NotNil(e.Error())
 	}
 	wait.Wait()
