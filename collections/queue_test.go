@@ -252,7 +252,7 @@ func (suit *LinkedBlockDequeTestSuite) TestInterrupt() {
 	for i := 0; i < 2; i++ {
 		_, e := suit.deque.TakeFirst(ctx)
 		_, ok := e.(*InterruptedErr)
-		suit.True(ok, "expect InterruptedErr bug get %v", reflect.TypeOf(e))
+		suit.True(ok, "expect InterruptedErr but get %v", reflect.TypeOf(e))
 		suit.NotNil(e.Error())
 	}
 	wait.Wait()
@@ -501,4 +501,22 @@ func (suit *LinkedBlockDequeTestSuite) TestHasTakeWaiters() {
 	close(ch)
 	suit.Equal(1, val)
 	suit.False(suit.deque.HasTakeWaiters())
+}
+
+// https://github.com/jolestar/go-commons-pool/issues/44
+func (suit *LinkedBlockDequeTestSuite) TestDeadLock() {
+	ctx := context.Background()
+	suit.deque = NewDeque(1)
+	suit.deque.PutFirst(ctx, 1)
+	count := 1000000
+	testWG := sync.WaitGroup{}
+	testWG.Add(count)
+	for i := 0; i < count; i++ {
+		o := suit.NoErrorWithResult(suit.deque.PollFirstWithContext(ctx))
+		go func() {
+			suit.deque.PutFirst(ctx, o)
+			testWG.Done()
+		}()
+	}
+	testWG.Wait()
 }

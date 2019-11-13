@@ -90,10 +90,10 @@ func TestTimeoutCondWaitTimeoutNotify(t *testing.T) {
 	wait := sync.WaitGroup{}
 	wait.Add(2)
 	ch := make(chan time.Duration, 1)
-	timeout := 2 * time.Second
+	timeout := 5 * time.Second
 	go func() {
 		begin := time.Now()
-		obj.lockAndWaitWithTimeout(time.Duration(timeout) * time.Millisecond)
+		obj.lockAndWaitWithTimeout(timeout * time.Millisecond)
 		elapsed := time.Since(begin)
 		ch <- elapsed
 		wait.Done()
@@ -196,7 +196,7 @@ func TestInterrupted(t *testing.T) {
 	wait.Wait()
 	for i := 0; i < count; i++ {
 		b := <-ch
-		assert.True(t, b, "expect %v interrupted bug get false", i)
+		assert.True(t, b, "expect %v interrupted but get false", i)
 	}
 }
 
@@ -222,7 +222,7 @@ func TestInterruptedWithTimeout(t *testing.T) {
 	wait.Wait()
 	for i := 0; i < count; i++ {
 		b := <-ch
-		assert.True(t, b, "expect %v interrupted bug get false", i)
+		assert.True(t, b, "expect %v interrupted but get false", i)
 	}
 }
 

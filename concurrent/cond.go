@@ -13,11 +13,12 @@ type TimeoutCond struct {
 	hasWaiters uint64
 	L          sync.Locker
 	signal     chan int
+	condL      sync.RWMutex
 }
 
 // NewTimeoutCond return a new TimeoutCond
 func NewTimeoutCond(l sync.Locker) *TimeoutCond {
-	cond := TimeoutCond{L: l, signal: make(chan int, 0)}
+	cond := TimeoutCond{L: l, signal: make(chan int, 1), condL: sync.RWMutex{}}
 	return &cond
 }
 
@@ -45,8 +46,11 @@ func (cond *TimeoutCond) HasWaiters() bool {
 // Wait waits for a signal, or for the context do be done. Returns true if signaled.
 func (cond *TimeoutCond) Wait(ctx context.Context) bool {
 	cond.addWaiter()
+
+	cond.condL.RLock()
 	//copy signal in lock, avoid data race with Interrupt
 	ch := cond.signal
+	cond.condL.RUnlock()
 	//wait should unlock mutex,  if not will cause deadlock
 	cond.L.Unlock()
 	defer cond.removeWaiter()
@@ -62,16 +66,18 @@ func (cond *TimeoutCond) Wait(ctx context.Context) bool {
 
 // Signal wakes one goroutine waiting on c, if there is any.
 func (cond *TimeoutCond) Signal() {
+	cond.condL.RLock()
 	select {
 	case cond.signal <- 1:
 	default:
 	}
+	cond.condL.RUnlock()
 }
 
 // Interrupt goroutine wait on this TimeoutCond
 func (cond *TimeoutCond) Interrupt() {
-	cond.L.Lock()
-	defer cond.L.Unlock()
+	cond.condL.Lock()
+	defer cond.condL.Unlock()
 	close(cond.signal)
 	cond.signal = make(chan int, 0)
 }
