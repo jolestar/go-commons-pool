@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jolestar/go-commons-pool/collections"
-	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/jolestar/go-commons-pool/v2/collections"
+	"github.com/jolestar/go-commons-pool/v2/concurrent"
 )
 
 type baseErr struct {
@@ -594,7 +594,7 @@ func (pool *ObjectPool) evict(ctx context.Context) {
 
 	var idleSoftEvictTime = time.Duration(math.MaxInt64)
 	if pool.Config.SoftMinEvictableIdleTime > 0 {
-		idleSoftEvictTime = pool.Config.SoftMinEvictableIdleTime;
+		idleSoftEvictTime = pool.Config.SoftMinEvictableIdleTime
 	}
 	evictionConfig := EvictionConfig{
 		IdleEvictTime:     idleEvictTime,

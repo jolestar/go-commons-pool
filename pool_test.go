@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	"github.com/jolestar/go-commons-pool/collections"
-	"github.com/jolestar/go-commons-pool/concurrent"
+	"github.com/jolestar/go-commons-pool/v2/collections"
+	"github.com/jolestar/go-commons-pool/v2/concurrent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

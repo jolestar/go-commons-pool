@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/jolestar/go-commons-pool"
+	"github.com/jolestar/go-commons-pool/v2"
 )
 
 func Example_multipleBorrowers() {
