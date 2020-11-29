@@ -185,7 +185,7 @@ type ObjectPoolConfig struct {
 	/**
 	 * The context.Context to use when the evictor runs in the background.
 	 */
-	EvitionContext context.Context
+	EvictionContext context.Context
 }
 
 // NewDefaultPoolConfig return a ObjectPoolConfig instance init with default value.
@@ -199,7 +199,7 @@ func NewDefaultPoolConfig() *ObjectPoolConfig {
 		SoftMinEvictableIdleTime: DefaultSoftMinEvictableIdleTime,
 		NumTestsPerEvictionRun:   DefaultNumTestsPerEvictionRun,
 		EvictionPolicyName:       DefaultEvictionPolicyName,
-		EvitionContext:           context.Background(),
+		EvictionContext:          context.Background(),
 		TestOnCreate:             DefaultTestOnCreate,
 		TestOnBorrow:             DefaultTestOnBorrow,
 		TestOnReturn:             DefaultTestOnReturn,

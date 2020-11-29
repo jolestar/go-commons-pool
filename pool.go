@@ -527,8 +527,8 @@ func (pool *ObjectPool) startEvictor(delay time.Duration) {
 			for {
 				select {
 				case <-pool.evictor.C:
-					pool.evict(pool.Config.EvitionContext)
-					pool.ensureMinIdle(pool.Config.EvitionContext)
+					pool.evict(pool.Config.EvictionContext)
+					pool.ensureMinIdle(pool.Config.EvictionContext)
 				case <-pool.evictorStopChan:
 					pool.evictorStopWG.Done()
 					return
@@ -600,7 +600,7 @@ func (pool *ObjectPool) evict(ctx context.Context) {
 		IdleEvictTime:     idleEvictTime,
 		IdleSoftEvictTime: idleSoftEvictTime,
 		MinIdle:           pool.Config.MinIdle,
-		Context:           pool.Config.EvitionContext}
+		Context:           pool.Config.EvictionContext}
 
 	testWhileIdle := pool.Config.TestWhileIdle
 	for i, m := 0, pool.getNumTests(); i < m; i++ {
