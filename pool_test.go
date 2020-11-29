@@ -1376,7 +1376,7 @@ func (suit *PoolTestSuite) TestEvictionInvalid() {
 		if debugTest {
 			fmt.Println("TestEvictionInvalid evict goroutine.")
 		}
-		suit.pool.evict(suit.pool.Config.EvitionContext)
+		suit.pool.evict(suit.pool.Config.EvictionContext)
 	}()
 
 	// Sleep to make sure evictor has started
