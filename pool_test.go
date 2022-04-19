@@ -2059,6 +2059,32 @@ func (suit *PoolTestSuite) TestPreparePool() {
 	suit.Equal(1, suit.pool.GetNumIdle())
 }
 
+func (suit *PoolTestSuite) TestConcurrentCloseAndEvict() {
+	ctx := context.Background()
+	suit.pool.Config.MinIdle = 1
+	suit.pool.Config.SoftMinEvictableIdleTime = time.Millisecond * 100
+	suit.pool.Config.TimeBetweenEvictionRuns = time.Millisecond * 500
+	suit.factory.destroyLatency = time.Millisecond * 1000 // Destroy takes 1000 ms
+	suit.pool.PreparePool(ctx)
+	suit.pool.StartEvictor()
+	suit.Equal(1, suit.pool.GetNumIdle())
+	ticker := time.NewTicker(time.Millisecond * 1000)
+	testTimeoutTicker := time.NewTicker(time.Millisecond * 5000) // if time exceeds test fails
+	defer ticker.Stop()
+	defer testTimeoutTicker.Stop()
+	go func() {
+		select {
+		case <-testTimeoutTicker.C:
+			// Time-out
+			suit.FailNow("Time is exceeds on pool close")
+		}
+	}()
+	select {
+	case <-ticker.C:
+		suit.pool.Close(ctx)
+	}
+}
+
 func (suit *PoolTestSuite) TestValueFactory() {
 	suit.pool.factory = NewPooledObjectFactorySimple(func(context.Context) (interface{}, error) {
 		return "string value", nil
