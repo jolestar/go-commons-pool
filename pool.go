@@ -364,10 +364,7 @@ func (pool *ObjectPool) ensureIdle(ctx context.Context, idleCount int, always bo
 
 // IsClosed return this pool is closed
 func (pool *ObjectPool) IsClosed() bool {
-	pool.closeLock.Lock()
-	defer pool.closeLock.Unlock()
-	// in java commons pool, closed is volatile, golang has not volatile, so use mutex to avoid data race
-	return pool.closed
+	return pool.getClose()
 }
 
 // ReturnObject return an instance to the pool. By contract, object
@@ -483,9 +480,8 @@ func (pool *ObjectPool) Close(ctx context.Context) {
 	if pool.IsClosed() {
 		return
 	}
-	pool.closeLock.Lock()
-	defer pool.closeLock.Unlock()
-	if pool.closed {
+
+	if pool.getClose() {
 		return
 	}
 
@@ -493,7 +489,7 @@ func (pool *ObjectPool) Close(ctx context.Context) {
 	// assertOpen()
 	pool.startEvictor(-1)
 
-	pool.closed = true
+	pool.setClose(true)
 	// This clear removes any idle objects
 	pool.Clear(ctx)
 
@@ -666,6 +662,19 @@ func (pool *ObjectPool) evict(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (pool *ObjectPool) getClose() bool {
+	pool.closeLock.Lock()
+	defer pool.closeLock.Unlock()
+	// in java commons pool, closed is volatile, golang has not volatile, so use mutex to avoid data race
+	return pool.closed
+}
+
+func (pool *ObjectPool) setClose(closed bool) {
+	pool.closeLock.Lock()
+	defer pool.closeLock.Unlock()
+	pool.closed = closed
 }
 
 func (pool *ObjectPool) ensureMinIdle(ctx context.Context) {
